@@ -1,8 +1,5 @@
 {
   "generated_at": "2026-04-14T15:46:00.597626",
-  "base_url": "http://10.1.3.127:7017",
-  "provider": "openai",
-  "model": "gpt35_chat",
   "templates_dirs": [],
   "input_files": [
     "C:\\ML_HOME\\PPTStudio\\api_server.py",

@@ -582,6 +582,65 @@ async def ppt_slides_backgrounds(file_path: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
+async def ppt_textbox_style(
+    file_path: str,
+    slide_index: int = 0,
+    shape_id: Optional[int] = None,
+    shape_index: Optional[int] = None,
+) -> Dict[str, Any]:
+    """讀取指定文字框的底色、透明度、邊框樣式、邊框顏色。"""
+    return await _request(
+        "GET",
+        "/ppt/textbox_style",
+        params={
+            "file_path": file_path,
+            "slide_index": slide_index,
+            "shape_id": shape_id,
+            "shape_index": shape_index,
+        },
+    )
+
+
+@mcp.tool()
+async def ppt_slide_textbox_styles(file_path: str, slide_index: int = 0) -> Dict[str, Any]:
+    """列出指定頁全部文字框的樣式資訊。"""
+    return await _request(
+        "GET",
+        "/ppt/slide_textbox_styles",
+        params={"file_path": file_path, "slide_index": slide_index},
+    )
+
+
+@mcp.tool()
+async def set_textbox_style(
+    file_path: str,
+    slide_index: int,
+    shape_id: Optional[int] = None,
+    shape_index: Optional[int] = None,
+    fill_color: Optional[List[int]] = None,
+    fill_transparency: Optional[float] = None,
+    line_style: Optional[str] = None,
+    line_color: Optional[List[int]] = None,
+    line_width: Optional[int] = None,
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """更新文字框底色、透明度、邊框樣式、邊框顏色與邊框寬度。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+        "fill_color": _clean_rgb(fill_color) if fill_color is not None else None,
+        "fill_transparency": fill_transparency,
+        "line_style": line_style,
+        "line_color": _clean_rgb(line_color) if line_color is not None else None,
+        "line_width": line_width,
+        "save_as": save_as,
+    }
+    return await _request("POST", "/ppt/set_textbox_style", json_body=body)
+
+
+@mcp.tool()
 async def render_slide_to_image(
     file_path: str,
     slide_index: int,

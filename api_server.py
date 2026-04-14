@@ -32,6 +32,11 @@ from dataProcess.ppt_stdio import (
     add_shape,
     get_info,
     list_slides,
+    get_textbox_style,
+    get_slide_textbox_styles,
+    set_textbox_style,
+    get_slide_text_fonts,
+    scan_presentation_text_fonts,
     get_presentation_theme_info,
     get_slide_background_info,
     scan_presentation_backgrounds,
@@ -265,6 +270,19 @@ class SetSlideBackgroundImageRequest(BaseModel):
     save_as: Optional[str] = None
 
 
+class SetTextboxStyleRequest(BaseModel):
+    file_path: str
+    slide_index: int = Field(..., ge=0)
+    shape_id: Optional[int] = None
+    shape_index: Optional[int] = Field(None, ge=0)
+    fill_color: Optional[List[int]] = Field(None, min_length=3, max_length=3)
+    fill_transparency: Optional[float] = Field(None, ge=0.0, le=1.0)
+    line_style: Optional[str] = None
+    line_color: Optional[List[int]] = Field(None, min_length=3, max_length=3)
+    line_width: Optional[int] = Field(None, ge=0)
+    save_as: Optional[str] = None
+
+
 class RenderSlideToImageRequest(BaseModel):
     file_path: str
     slide_index: int = Field(..., ge=0)
@@ -357,6 +375,67 @@ def ppt_slides(file_path: str):
     try:
         doc = open_presentation(file_path)
         return _ok(list_slides(doc))
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.get("/ppt/textbox_style")
+def ppt_textbox_style(file_path: str, slide_index: int = 0, shape_id: Optional[int] = None, shape_index: Optional[int] = None):
+    try:
+        doc = open_presentation(file_path)
+        return _ok(get_textbox_style(doc, slide_index=slide_index, shape_id=shape_id, shape_index=shape_index))
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.get("/ppt/slide_textbox_styles")
+def ppt_slide_textbox_styles(file_path: str, slide_index: int = 0):
+    try:
+        doc = open_presentation(file_path)
+        return _ok(get_slide_textbox_styles(doc, slide_index=slide_index))
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/set_textbox_style")
+def ppt_set_textbox_style(req: SetTextboxStyleRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = set_textbox_style(
+            document=doc,
+            slide_index=req.slide_index,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+            fill_color=tuple(req.fill_color) if req.fill_color is not None else None,
+            fill_transparency=req.fill_transparency,
+            line_style=req.line_style,
+            line_color=tuple(req.line_color) if req.line_color is not None else None,
+            line_width=req.line_width,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="更新文字框樣式成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.get("/ppt/slide_fonts")
+def ppt_slide_fonts(file_path: str, slide_index: int = 0):
+    try:
+        doc = open_presentation(file_path)
+        return _ok(get_slide_text_fonts(doc, slide_index))
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.get("/ppt/slides_fonts")
+def ppt_slides_fonts(file_path: str):
+    try:
+        doc = open_presentation(file_path)
+        return _ok(scan_presentation_text_fonts(doc))
     except Exception as e:
         _err_to_http(e)
 

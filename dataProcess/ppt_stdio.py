@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 PPTX 核心操作模組
 - 建立新簡報
@@ -28,6 +28,7 @@ try:
     from pptx.util import Inches, Pt, Emu
     from pptx.enum.text import PP_ALIGN
     from pptx.dml.color import RGBColor
+    from pptx.enum.dml import MSO_LINE_DASH_STYLE
     from pptx.enum.shapes import MSO_AUTO_SHAPE_TYPE
     from copy import deepcopy
     from pptx.enum.shapes import PP_PLACEHOLDER
@@ -46,6 +47,7 @@ try:
     import fitz  # PyMuPDF
     import matplotlib.pyplot as plt
     import matplotlib.image as mpimg
+    from matplotlib import font_manager
     PYTHON_PPTX_EXTRA_AVAILABLE = True
 except ImportError:
     PYTHON_PPTX_EXTRA_AVAILABLE = False
@@ -209,6 +211,87 @@ def _resolve_font_name(font_name: Optional[str]) -> Optional[str]:
             pass
 
     return os.path.splitext(os.path.basename(font_path))[0]
+
+def _activate_matplotlib_chinese_font() -> None:
+    """
+    設定 matplotlib 可用的中文字型，避免截圖標題顯示為方塊。
+    """
+    if not PYTHON_PPTX_EXTRA_AVAILABLE:
+        return
+
+    preferred_fonts = [
+        "Microsoft JhengHei",
+        "Microsoft YaHei",
+        "PingFang TC",
+        "Noto Sans CJK TC",
+        "Noto Sans CJK SC",
+        "SimHei",
+        "DejaVu Sans",
+    ]
+    try:
+        available_fonts = {f.name for f in font_manager.fontManager.ttflist}
+        active_fonts = [font for font in preferred_fonts if font in available_fonts]
+        if not active_fonts:
+            active_fonts = ["DejaVu Sans"]
+    except Exception:
+        active_fonts = ["Microsoft JhengHei", "DejaVu Sans"]
+
+    plt.rcParams["font.sans-serif"] = active_fonts
+    plt.rcParams["axes.unicode_minus"] = False
+
+
+def _rgb_from_color(color_obj: Any) -> Optional[List[int]]:
+    if color_obj is None:
+        return None
+    try:
+        rgb = color_obj.rgb
+    except Exception:
+        return None
+    if rgb is None:
+        return None
+
+    hex_value = str(rgb).strip().lstrip("#")
+    if len(hex_value) != 6:
+        return None
+    try:
+        return [int(hex_value[0:2], 16), int(hex_value[2:4], 16), int(hex_value[4:6], 16)]
+    except Exception:
+        return None
+
+
+def _dash_style_to_name(dash_style: Any) -> Optional[str]:
+    if dash_style is None:
+        return "solid"
+    name = getattr(dash_style, "name", None)
+    if name:
+        return str(name).lower()
+    return str(dash_style).lower()
+
+
+def _name_to_dash_style(line_style: Optional[str]) -> Any:
+    if line_style is None:
+        return None
+
+    normalized = str(line_style).strip().lower()
+    if not normalized:
+        return None
+    if normalized == "solid":
+        return None
+
+    candidates: Dict[str, List[str]] = {
+        "dash": ["DASH", "SYS_DASH", "LG_DASH"],
+        "dot": ["ROUND_DOT", "SQUARE_DOT", "SYS_DOT"],
+        "dash_dot": ["DASH_DOT", "SYS_DASH_DOT", "LG_DASH_DOT"],
+        "dash_dot_dot": ["DASH_DOT_DOT", "SYS_DASH_DOT_DOT", "LG_DASH_DOT_DOT"],
+    }
+    if normalized not in candidates:
+        raise ValueError("line_style 必須是 solid/dash/dot/dash_dot/dash_dot_dot")
+
+    for enum_name in candidates[normalized]:
+        enum_val = getattr(MSO_LINE_DASH_STYLE, enum_name, None)
+        if enum_val is not None:
+            return enum_val
+    raise ValueError(f"目前環境不支援 line_style={normalized}")
 
 
 class PPTDocument:
@@ -706,6 +789,330 @@ class PPTDocument:
                 "shapes": shape_infos,
             })
         return results
+
+    def _get_textbox_shape(self, slide_index: int, shape_id: Optional[int] = None, shape_index: Optional[int] = None):
+        _validate_slide_index(self.prs, slide_index)
+        slide = self.prs.slides[slide_index]
+
+        if shape_id is None and shape_index is None:
+            raise ValueError("shape_id 與 shape_index 至少需提供一個")
+
+        if shape_id is not None:
+            for idx, shape in enumerate(slide.shapes):
+                if getattr(shape, "shape_id", None) == shape_id:
+                    if not getattr(shape, "has_text_frame", False):
+                        raise ValueError(f"shape_id={shape_id} 不是文字框（has_text_frame=False）")
+                    return shape, idx
+            raise ValueError(f"找不到 shape_id={shape_id}")
+
+        assert shape_index is not None
+        if shape_index < 0 or shape_index >= len(slide.shapes):
+            raise IndexError(f"shape_index 超出範圍: {shape_index}, shape_count={len(slide.shapes)}")
+        shape = slide.shapes[shape_index]
+        if not getattr(shape, "has_text_frame", False):
+            raise ValueError(f"shape_index={shape_index} 不是文字框（has_text_frame=False）")
+        return shape, shape_index
+
+    def get_textbox_style(self, slide_index: int, shape_id: Optional[int] = None, shape_index: Optional[int] = None) -> Dict[str, Any]:
+        shape, resolved_shape_index = self._get_textbox_shape(
+            slide_index=slide_index,
+            shape_id=shape_id,
+            shape_index=shape_index,
+        )
+
+        fill_info = {
+            "fill_type": "unknown",
+            "fill_color": None,
+            "fill_transparency": None,
+        }
+        line_info = {
+            "line_style": None,
+            "line_color": None,
+            "line_width_emu": None,
+        }
+        notes: List[str] = []
+
+        try:
+            fill = shape.fill
+            fill_type_raw = getattr(fill, "type", None)
+            if fill_type_raw is None:
+                fill_info["fill_type"] = "inherit"
+            else:
+                fill_type_name = str(fill_type_raw).lower()
+                if "solid" in fill_type_name:
+                    fill_info["fill_type"] = "solid"
+                elif "pattern" in fill_type_name:
+                    fill_info["fill_type"] = "pattern"
+                elif "gradient" in fill_type_name:
+                    fill_info["fill_type"] = "gradient"
+                elif "picture" in fill_type_name:
+                    fill_info["fill_type"] = "picture"
+                elif "background" in fill_type_name:
+                    fill_info["fill_type"] = "background"
+                else:
+                    fill_info["fill_type"] = fill_type_name
+
+            fill_info["fill_color"] = _rgb_from_color(getattr(fill, "fore_color", None))
+            try:
+                fill_info["fill_transparency"] = float(fill.transparency) if fill.transparency is not None else None
+            except Exception:
+                fill_info["fill_transparency"] = None
+        except Exception as exc:
+            notes.append(f"讀取 fill 資訊失敗: {exc}")
+
+        try:
+            line = shape.line
+            line_info["line_style"] = _dash_style_to_name(getattr(line, "dash_style", None))
+            line_info["line_color"] = _rgb_from_color(getattr(line, "color", None))
+            line_info["line_width_emu"] = int(line.width) if line.width is not None else None
+        except Exception as exc:
+            notes.append(f"讀取 line 資訊失敗: {exc}")
+
+        return {
+            "slide_index": slide_index,
+            "shape_index": resolved_shape_index,
+            "shape_id": getattr(shape, "shape_id", None),
+            "name": getattr(shape, "name", None),
+            "text_preview": (shape.text_frame.text or "").strip()[:120],
+            "fill_type": fill_info["fill_type"],
+            "fill_color": fill_info["fill_color"],
+            "fill_transparency": fill_info["fill_transparency"],
+            "line_style": line_info["line_style"],
+            "line_color": line_info["line_color"],
+            "line_width_emu": line_info["line_width_emu"],
+            "notes": notes,
+        }
+
+    def get_slide_textbox_styles(self, slide_index: int) -> Dict[str, Any]:
+        _validate_slide_index(self.prs, slide_index)
+        slide = self.prs.slides[slide_index]
+        textbox_styles: List[Dict[str, Any]] = []
+
+        for idx, shape in enumerate(slide.shapes):
+            if not getattr(shape, "has_text_frame", False):
+                continue
+            textbox_styles.append(self.get_textbox_style(slide_index=slide_index, shape_index=idx))
+
+        return {
+            "slide_index": slide_index,
+            "shape_count": len(slide.shapes),
+            "textbox_count": len(textbox_styles),
+            "textboxes": textbox_styles,
+        }
+
+    def set_textbox_style(
+            self,
+            slide_index: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+            fill_color: Optional[Tuple[int, int, int]] = None,
+            fill_transparency: Optional[float] = None,
+            line_style: Optional[str] = None,
+            line_color: Optional[Tuple[int, int, int]] = None,
+            line_width: Optional[int] = None,
+        ) -> Dict[str, Any]:
+        shape, resolved_shape_index = self._get_textbox_shape(
+            slide_index=slide_index,
+            shape_id=shape_id,
+            shape_index=shape_index,
+        )
+
+        if fill_transparency is not None and not (0.0 <= float(fill_transparency) <= 1.0):
+            raise ValueError("fill_transparency 必須介於 0.0 ~ 1.0")
+        if line_width is not None and line_width < 0:
+            raise ValueError("line_width 不可小於 0")
+
+        notes: List[str] = []
+
+        if fill_color is not None or fill_transparency is not None:
+            shape.fill.solid()
+            if fill_color is not None:
+                shape.fill.fore_color.rgb = _rgb_tuple_to_color(fill_color)
+            if fill_transparency is not None:
+                try:
+                    shape.fill.transparency = float(fill_transparency)
+                except Exception as exc:
+                    notes.append(f"設定 fill_transparency 失敗: {exc}")
+
+        if line_color is not None:
+            shape.line.color.rgb = _rgb_tuple_to_color(line_color)
+        if line_width is not None:
+            shape.line.width = Emu(line_width)
+        if line_style is not None:
+            shape.line.dash_style = _name_to_dash_style(line_style)
+
+        result = self.get_textbox_style(slide_index=slide_index, shape_index=resolved_shape_index)
+        result["notes"].extend(notes)
+        return result
+
+    def get_slide_text_fonts(self, slide_index: int) -> Dict[str, Any]:
+        """
+        讀取指定頁文字來源（文字框與表格 cell）內各 run 的字型資訊。
+        """
+        _validate_slide_index(self.prs, slide_index)
+
+        slide = self.prs.slides[slide_index]
+        font_counter: Dict[str, int] = {}
+        unresolved_run_count = 0
+        shape_results: List[Dict[str, Any]] = []
+        text_shape_count = 0
+        table_shape_count = 0
+        table_text_cell_count = 0
+
+        def _collect_paragraph_runs(paragraph, paragraph_info: Dict[str, Any]) -> None:
+            nonlocal unresolved_run_count
+            if len(paragraph.runs) == 0:
+                if (paragraph.text or "").strip():
+                    unresolved_run_count += 1
+                paragraph_info["runs"].append(
+                    {
+                        "run_index": 0,
+                        "text": paragraph.text or "",
+                        "font_name": None,
+                        "font_size_pt": None,
+                        "bold": None,
+                        "italic": None,
+                    }
+                )
+                return
+
+            for run_index, run in enumerate(paragraph.runs):
+                run_text = run.text or ""
+                font_name = run.font.name
+                font_size_pt = float(run.font.size.pt) if run.font.size is not None else None
+                bold = run.font.bold
+                italic = run.font.italic
+
+                if font_name:
+                    font_counter[font_name] = font_counter.get(font_name, 0) + 1
+                elif run_text.strip():
+                    unresolved_run_count += 1
+
+                paragraph_info["runs"].append(
+                    {
+                        "run_index": run_index,
+                        "text": run_text,
+                        "font_name": font_name,
+                        "font_size_pt": font_size_pt,
+                        "bold": bold,
+                        "italic": italic,
+                    }
+                )
+
+        for shape_index, shape in enumerate(slide.shapes):
+            has_text_frame = bool(getattr(shape, "has_text_frame", False))
+            has_table = bool(getattr(shape, "has_table", False))
+            if not has_text_frame and not has_table:
+                continue
+
+            shape_info: Dict[str, Any] = {
+                "shape_index": shape_index,
+                "shape_id": getattr(shape, "shape_id", None),
+                "name": getattr(shape, "name", None),
+                "text_preview": "",
+                "kind": "text_frame" if has_text_frame else "table",
+                "paragraphs": [],
+            }
+
+            if has_text_frame:
+                text_shape_count += 1
+                tf = shape.text_frame
+                try:
+                    shape_info["text_preview"] = (tf.text or "").strip()[:120]
+                except Exception:
+                    shape_info["text_preview"] = ""
+
+                for paragraph_index, paragraph in enumerate(tf.paragraphs):
+                    paragraph_info: Dict[str, Any] = {
+                        "paragraph_index": paragraph_index,
+                        "text": paragraph.text or "",
+                        "runs": [],
+                    }
+                    _collect_paragraph_runs(paragraph, paragraph_info)
+                    shape_info["paragraphs"].append(paragraph_info)
+
+            if has_table:
+                table_shape_count += 1
+                preview_texts: List[str] = []
+                for row_index, row in enumerate(shape.table.rows):
+                    for col_index, cell in enumerate(row.cells):
+                        cell_text = cell.text or ""
+                        if cell_text.strip():
+                            table_text_cell_count += 1
+                            if len(preview_texts) < 3:
+                                preview_texts.append(cell_text.strip())
+
+                        for paragraph_index, paragraph in enumerate(cell.text_frame.paragraphs):
+                            paragraph_info = {
+                                "row_index": row_index,
+                                "col_index": col_index,
+                                "paragraph_index": paragraph_index,
+                                "text": paragraph.text or "",
+                                "runs": [],
+                            }
+                            _collect_paragraph_runs(paragraph, paragraph_info)
+                            shape_info["paragraphs"].append(paragraph_info)
+
+                if not shape_info["text_preview"]:
+                    shape_info["text_preview"] = " | ".join(preview_texts)[:120]
+
+            shape_results.append(shape_info)
+
+        font_summary = [
+            {"font_name": name, "count": count}
+            for name, count in sorted(font_counter.items(), key=lambda x: (-x[1], x[0]))
+        ]
+
+        notes: List[str] = []
+        if unresolved_run_count > 0:
+            notes.append("部分文字 run 未設定字型（可能沿用母片/樣式）。")
+
+        return {
+            "slide_index": slide_index,
+            "shape_count": len(slide.shapes),
+            "text_shape_count": text_shape_count,
+            "table_shape_count": table_shape_count,
+            "table_text_cell_count": table_text_cell_count,
+            "detected_font_count": len(font_summary),
+            "unresolved_run_count": unresolved_run_count,
+            "font_summary": font_summary,
+            "shapes": shape_results,
+            "notes": notes,
+        }
+
+    def scan_presentation_text_fonts(self) -> Dict[str, Any]:
+        """
+        掃描整份簡報每一頁的文字字型資訊。
+        """
+        slide_count = len(self.prs.slides)
+        slides: List[Dict[str, Any]] = []
+        aggregate_counter: Dict[str, int] = {}
+        unresolved_run_count = 0
+
+        for slide_index in range(slide_count):
+            slide_info = self.get_slide_text_fonts(slide_index)
+            slides.append(slide_info)
+
+            unresolved_run_count += slide_info.get("unresolved_run_count", 0)
+            for item in slide_info.get("font_summary", []):
+                font_name = item.get("font_name")
+                count = int(item.get("count", 0))
+                if font_name:
+                    aggregate_counter[font_name] = aggregate_counter.get(font_name, 0) + count
+
+        font_summary = [
+            {"font_name": name, "count": count}
+            for name, count in sorted(aggregate_counter.items(), key=lambda x: (-x[1], x[0]))
+        ]
+
+        return {
+            "file_path": self.file_path,
+            "slide_count": slide_count,
+            "detected_font_count": len(font_summary),
+            "unresolved_run_count": unresolved_run_count,
+            "font_summary": font_summary,
+            "slides": slides,
+        }
 
     def delete_slide(self, slide_index: int) -> Dict[str, Any]:
         _validate_slide_index(self.prs, slide_index)
@@ -1228,6 +1635,54 @@ def get_info(document: PPTDocument) -> Dict[str, Any]:
 
 def list_slides(document: PPTDocument) -> List[Dict[str, Any]]:
     return document.list_slides()
+
+
+def get_textbox_style(
+        document: PPTDocument,
+        slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    return document.get_textbox_style(
+        slide_index=slide_index,
+        shape_id=shape_id,
+        shape_index=shape_index,
+    )
+
+
+def get_slide_textbox_styles(document: PPTDocument, slide_index: int) -> Dict[str, Any]:
+    return document.get_slide_textbox_styles(slide_index=slide_index)
+
+
+def set_textbox_style(
+        document: PPTDocument,
+        slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        fill_color: Optional[Tuple[int, int, int]] = None,
+        fill_transparency: Optional[float] = None,
+        line_style: Optional[str] = None,
+        line_color: Optional[Tuple[int, int, int]] = None,
+        line_width: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    return document.set_textbox_style(
+        slide_index=slide_index,
+        shape_id=shape_id,
+        shape_index=shape_index,
+        fill_color=fill_color,
+        fill_transparency=fill_transparency,
+        line_style=line_style,
+        line_color=line_color,
+        line_width=line_width,
+    )
+
+
+def get_slide_text_fonts(document: PPTDocument, slide_index: int) -> Dict[str, Any]:
+    return document.get_slide_text_fonts(slide_index=slide_index)
+
+
+def scan_presentation_text_fonts(document: PPTDocument) -> Dict[str, Any]:
+    return document.scan_presentation_text_fonts()
 
 
 def set_slide_background_color(
@@ -2083,6 +2538,8 @@ def render_slides_to_grid_image(
     if cols < 1:
         raise ValueError("cols 必須 >= 1")
 
+    _activate_matplotlib_chinese_font()
+
     output_path = os.path.abspath(output_path)
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
@@ -2201,3 +2658,4 @@ if __name__ == "__main__":
 
     save(doc)
     print(get_info(doc))
+
