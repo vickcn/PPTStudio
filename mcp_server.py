@@ -35,7 +35,7 @@ DEFAULT_API_BASE = os.getenv("PPT_API_BASE", "http://10.1.3.127:6414")
 DEFAULT_TIMEOUT = float(os.getenv("PPT_API_TIMEOUT", "180"))
 
 mcp = FastMCP(
-    "ppt-api-mcp",
+    "ppt",
     instructions=(
         "MCP server for PPT operations backed by an existing FastAPI PPT API. "
         "Use these tools to create, inspect, edit, reorder, render, and save PPTX files."
@@ -550,6 +550,35 @@ async def set_slides_background_image(
     if save_as:
         body["save_as"] = save_as
     return await _request("POST", "/ppt/set_slides_background_image", json_body=body)
+
+
+@mcp.tool()
+async def ppt_theme_info(file_path: str) -> Dict[str, Any]:
+    """
+    呼叫 GET /ppt/theme_info，讀取 PPTX 佈景主題（theme）、色彩配置、字型配置等摘要。
+    需先啟動 api_server；底層邏輯由 ppt_stdio.get_presentation_theme_info 提供。
+    """
+    return await _request("GET", "/ppt/theme_info", params={"file_path": file_path})
+
+
+@mcp.tool()
+async def ppt_slide_background(file_path: str, slide_index: int = 0) -> Dict[str, Any]:
+    """
+    呼叫 GET /ppt/slide_background，讀取指定頁之背景類型（繼承母片、純色、圖片、滿版圖片模擬等）。
+    """
+    return await _request(
+        "GET",
+        "/ppt/slide_background",
+        params={"file_path": file_path, "slide_index": slide_index},
+    )
+
+
+@mcp.tool()
+async def ppt_slides_backgrounds(file_path: str) -> Dict[str, Any]:
+    """
+    呼叫 GET /ppt/slides_backgrounds，一次掃描整份簡報各頁背景並附帶 theme 摘要。
+    """
+    return await _request("GET", "/ppt/slides_backgrounds", params={"file_path": file_path})
 
 
 @mcp.tool()

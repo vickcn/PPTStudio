@@ -32,6 +32,9 @@ from dataProcess.ppt_stdio import (
     add_shape,
     get_info,
     list_slides,
+    get_presentation_theme_info,
+    get_slide_background_info,
+    scan_presentation_backgrounds,
     set_slide_background_color,
     set_slide_background_image,
     set_slides_background_color,
@@ -354,6 +357,36 @@ def ppt_slides(file_path: str):
     try:
         doc = open_presentation(file_path)
         return _ok(list_slides(doc))
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.get("/ppt/theme_info")
+def ppt_theme_info(file_path: str):
+    """讀取簡報佈景主題（theme）相關資訊；底層實作於 dataProcess.ppt_stdio.get_presentation_theme_info。"""
+    try:
+        doc = open_presentation(file_path)
+        return _ok(get_presentation_theme_info(doc))
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.get("/ppt/slide_background")
+def ppt_slide_background(file_path: str, slide_index: int = 0):
+    """讀取單頁投影片背景；底層實作於 get_slide_background_info。"""
+    try:
+        doc = open_presentation(file_path)
+        return _ok(get_slide_background_info(doc, slide_index))
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.get("/ppt/slides_backgrounds")
+def ppt_slides_backgrounds(file_path: str):
+    """掃描整份簡報各頁背景；底層實作於 scan_presentation_backgrounds。"""
+    try:
+        doc = open_presentation(file_path)
+        return _ok(scan_presentation_backgrounds(doc))
     except Exception as e:
         _err_to_http(e)
 

@@ -19,6 +19,10 @@ import os
 import json
 from typing import Any, Dict, List, Optional, Tuple
 
+# 實作「佈景主題 / 投影片背景」讀取（解析 pptx 內 XML）時請啟用標準庫：
+# import zipfile
+# from xml.etree import ElementTree as ET
+
 try:
     from pptx import Presentation
     from pptx.util import Inches, Pt, Emu
@@ -1240,6 +1244,600 @@ def set_slide_background_image(
         image_path: str,
     ) -> dict:
     return document.set_slide_background_image(slide_index=slide_index, image_path=image_path)
+
+
+# ---------------------------------------------------------------------------
+# 佈景主題與背景讀取（骨架）：規格見 issues/布景背景偵測.iss
+# ---------------------------------------------------------------------------
+
+
+def _get_theme_part_info(document: PPTDocument) -> Dict[str, Any]:
+    """
+    從 python-pptx 的 package / relationship 找出 theme 相關 part 路徑與基本資訊。
+
+    實作提示：
+    - 可從 document.prs.part.package、slide master rels、presentation rels 尋找 theme 關聯
+    - 關鍵欄位至少覆蓋：has_theme、theme_part_name、slide_master_count、notes
+    - theme_part_name 格式期望類似：/ppt/theme/theme1.xml
+    - 若某關聯失敗或不存在，改寫入 notes，不直接中斷整體流程
+    """
+    notes: List[str] = []
+    theme_part_name: Optional[str] = None
+
+    try:
+        slide_master_count = len(document.prs.slide_masters)
+    except Exception:
+        slide_master_count = 0
+        notes.append("無法取得 slide master 數量。")
+
+    rel_sources: List[Tuple[str, Any]] = []
+    try:
+        rel_sources.append(("presentation", document.prs.part.rels))
+    except Exception as exc:
+        notes.append(f"無法讀取 presentation rels: {exc}")
+
+    try:
+        for idx, master in enumerate(document.prs.slide_masters):
+            try:
+                rel_sources.append((f"slide_master_{idx}", master.part.rels))
+            except Exception as exc:
+                notes.append(f"無法讀取 slide_master_{idx} rels: {exc}")
+    except Exception as exc:
+        notes.append(f"無法走訪 slide masters: {exc}")
+
+    for source_name, rels in rel_sources:
+        try:
+            rel_values = list(rels.values())
+        except Exception as exc:
+            notes.append(f"{source_name} rels 讀取失敗: {exc}")
+            continue
+
+        for rel in rel_values:
+            reltype = str(getattr(rel, "reltype", ""))
+            if not reltype.endswith("/theme"):
+                continue
+
+            try:
+                partname = str(rel.target_part.partname)
+                if partname:
+                    theme_part_name = partname if partname.startswith("/") else f"/{partname}"
+                    break
+            except Exception:
+                try:
+                    target_ref = str(getattr(rel, "target_ref", "")).strip()
+                    if target_ref:
+                        normalized = target_ref if target_ref.startswith("/") else f"/{target_ref}"
+                        theme_part_name = normalized
+                        break
+                except Exception as exc:
+                    notes.append(f"{source_name} theme 關聯解析失敗: {exc}")
+
+        if theme_part_name:
+            break
+
+    if not theme_part_name:
+        notes.append("找不到 theme relationship，可能為無主題或無法由目前關聯追溯。")
+
+    return {
+        "has_theme": bool(theme_part_name),
+        "theme_part_name": theme_part_name,
+        "slide_master_count": slide_master_count,
+        "notes": notes,
+    }
+
+
+def _parse_theme_xml(theme_xml_bytes: bytes) -> Dict[str, Any]:
+    """
+    解析 theme XML（a:theme / clrScheme / fontScheme 等），抽出 color_scheme、font_scheme。
+
+    實作提示：
+    - 使用 ElementTree 與 OOXML 命名空間對應表
+    - 需支援抽取 theme_name、color_scheme、font_scheme
+    - 單一節點失敗不應讓整體解析中斷，可寫入 notes
+    """
+    from xml.etree import ElementTree as ET
+
+    notes: List[str] = []
+    theme_name: Optional[str] = None
+    color_scheme: Dict[str, Any] = {}
+    font_scheme: Dict[str, Any] = {}
+
+    def _local(tag: str) -> str:
+        return tag.split("}", 1)[-1]
+
+    def _parse_font_group(group_elem: Optional[ET.Element], ns: Dict[str, str]) -> Dict[str, Any]:
+        parsed: Dict[str, Any] = {"latin": None, "ea": None, "cs": None, "scripts": {}}
+        if group_elem is None:
+            return parsed
+
+        for key in ("latin", "ea", "cs"):
+            node = group_elem.find(f"a:{key}", ns)
+            if node is not None:
+                parsed[key] = node.attrib.get("typeface")
+
+        for node in group_elem.findall("a:font", ns):
+            script = node.attrib.get("script")
+            typeface = node.attrib.get("typeface")
+            if script and typeface:
+                parsed["scripts"][script] = typeface
+        return parsed
+
+    try:
+        root = ET.fromstring(theme_xml_bytes)
+    except Exception as exc:
+        return {
+            "theme_name": None,
+            "color_scheme": {},
+            "font_scheme": {},
+            "notes": [f"theme XML 解析失敗: {exc}"],
+        }
+
+    ns = {"a": "http://schemas.openxmlformats.org/drawingml/2006/main"}
+    theme_name = root.attrib.get("name")
+
+    theme_elements = root.find("a:themeElements", ns)
+    if theme_elements is None:
+        notes.append("themeElements 不存在。")
+        return {
+            "theme_name": theme_name,
+            "color_scheme": color_scheme,
+            "font_scheme": font_scheme,
+            "notes": notes,
+        }
+
+    clr_scheme = theme_elements.find("a:clrScheme", ns)
+    if clr_scheme is None:
+        notes.append("clrScheme 不存在。")
+    else:
+        color_scheme["name"] = clr_scheme.attrib.get("name")
+        values: Dict[str, Optional[str]] = {}
+        for node in list(clr_scheme):
+            key = _local(node.tag)
+            srgb = node.find(".//a:srgbClr", ns)
+            sys_clr = node.find(".//a:sysClr", ns)
+            scheme_clr = node.find(".//a:schemeClr", ns)
+
+            val: Optional[str] = None
+            if srgb is not None:
+                val = srgb.attrib.get("val")
+            elif sys_clr is not None:
+                val = sys_clr.attrib.get("lastClr") or sys_clr.attrib.get("val")
+            elif scheme_clr is not None:
+                scheme_val = scheme_clr.attrib.get("val")
+                val = f"scheme:{scheme_val}" if scheme_val else "scheme"
+
+            values[key] = val
+        color_scheme["values"] = values
+
+    fs = theme_elements.find("a:fontScheme", ns)
+    if fs is None:
+        notes.append("fontScheme 不存在。")
+    else:
+        font_scheme["name"] = fs.attrib.get("name")
+        font_scheme["major"] = _parse_font_group(fs.find("a:majorFont", ns), ns)
+        font_scheme["minor"] = _parse_font_group(fs.find("a:minorFont", ns), ns)
+
+    return {
+        "theme_name": theme_name,
+        "color_scheme": color_scheme,
+        "font_scheme": font_scheme,
+        "notes": notes,
+    }
+
+
+def _get_slide_background_xml_info(document: PPTDocument, slide_index: int) -> Dict[str, Any]:
+    """
+    從指定頁的 slide XML / cSld / bg 等讀取背景相關原始線索（供 get_slide_background_info 彙整）。
+
+    實作提示：
+    - 區分 bgPr（背景樣式）與繼承母片的情況
+    - 可搭配 document.prs.slides[slide_index].element
+    - 嘗試辨識 solidFill / blipFill / gradFill / noFill / bgRef 等線索
+    - 回傳原始線索時，保留 source 與 notes，避免過度推論
+    """
+    from xml.etree import ElementTree as ET
+
+    _validate_slide_index(document.prs, slide_index)
+
+    notes: List[str] = []
+    result: Dict[str, Any] = {
+        "slide_index": slide_index,
+        "background_type": "unknown",
+        "source": "slide_xml",
+        "color_rgb": None,
+        "image_ref": None,
+        "image_path_hint": None,
+        "by_shape_detection": False,
+        "notes": notes,
+    }
+
+    ns = {
+        "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
+        "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+        "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+    }
+    rel_embed_key = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed"
+
+    def _hex_to_rgb(value: Optional[str]) -> Optional[List[int]]:
+        if not value:
+            return None
+        v = value.strip().lstrip("#")
+        if len(v) != 6:
+            return None
+        try:
+            return [int(v[0:2], 16), int(v[2:4], 16), int(v[4:6], 16)]
+        except Exception:
+            return None
+
+    slide = document.prs.slides[slide_index]
+    try:
+        root = ET.fromstring(slide.part.blob)
+    except Exception as exc:
+        notes.append(f"slide XML 解析失敗: {exc}")
+        return result
+
+    bg = root.find("./p:cSld/p:bg", ns)
+    if bg is None:
+        result["background_type"] = "inherit"
+        result["source"] = "slide_master"
+        notes.append("未找到 cSld/bg，判斷為沿用母片背景。")
+        return result
+
+    bg_pr = bg.find("p:bgPr", ns)
+    bg_ref = bg.find("p:bgRef", ns)
+
+    if bg_pr is None and bg_ref is not None:
+        result["background_type"] = "inherit"
+        result["source"] = "slide_bgRef"
+        notes.append("找到 bgRef，背景沿用母片/主題參照。")
+        return result
+
+    if bg_pr is None:
+        notes.append("找到 bg 但缺少 bgPr/bgRef，無法判定背景類型。")
+        return result
+
+    solid_fill = bg_pr.find("a:solidFill", ns)
+    if solid_fill is not None:
+        srgb = solid_fill.find("a:srgbClr", ns)
+        sys_clr = solid_fill.find("a:sysClr", ns)
+        scheme_clr = solid_fill.find("a:schemeClr", ns)
+
+        rgb = None
+        if srgb is not None:
+            rgb = _hex_to_rgb(srgb.attrib.get("val"))
+        elif sys_clr is not None:
+            rgb = _hex_to_rgb(sys_clr.attrib.get("lastClr") or sys_clr.attrib.get("val"))
+        elif scheme_clr is not None:
+            notes.append(f"solidFill 使用 schemeClr={scheme_clr.attrib.get('val')}，無法直接換算 RGB。")
+
+        result["background_type"] = "solid"
+        result["source"] = "slide_bgPr_solidFill"
+        result["color_rgb"] = rgb
+        if rgb is None:
+            notes.append("solidFill 存在，但未取得可用 RGB。")
+        return result
+
+    blip_fill = bg_pr.find("a:blipFill", ns)
+    if blip_fill is not None:
+        result["background_type"] = "picture"
+        result["source"] = "slide_bgPr_blipFill"
+
+        blip = blip_fill.find("a:blip", ns)
+        image_ref = None
+        if blip is not None:
+            image_ref = blip.attrib.get(rel_embed_key)
+        result["image_ref"] = image_ref
+
+        if image_ref:
+            try:
+                rel = slide.part.rels[image_ref]
+                partname = str(rel.target_part.partname)
+                result["image_path_hint"] = partname if partname.startswith("/") else f"/{partname}"
+            except Exception as exc:
+                notes.append(f"圖片 rId={image_ref} 無法解析到目標 part: {exc}")
+        else:
+            notes.append("blipFill 存在，但找不到 embed rId。")
+        return result
+
+    if bg_ref is not None:
+        result["background_type"] = "inherit"
+        result["source"] = "slide_bgRef"
+        notes.append("背景設定以 bgRef 參照母片/主題。")
+        return result
+
+    if bg_pr.find("a:gradFill", ns) is not None:
+        notes.append("偵測到 gradFill，當前版本未細分，回傳 unknown。")
+    elif bg_pr.find("a:noFill", ns) is not None:
+        notes.append("偵測到 noFill，背景可能仍由母片呈現，回傳 unknown。")
+    else:
+        notes.append("bgPr 存在但非 solid/picture，回傳 unknown。")
+
+    return result
+
+
+def _detect_full_slide_picture_shape(document: PPTDocument, slide_index: int) -> Dict[str, Any]:
+    """
+    偵測是否為「滿版圖片 shape 模擬背景」：位置約 (0,0)、尺寸接近整張投影片。
+
+    實作提示：
+    - 比對 shape 類型是否為圖片、left/top/width/height 與投影片寬高（EMU）
+    - 回傳是否命中、候選 shape 索引、image_ref/image_path_hint、notes
+    - 容差建議使用比例閾值（例如寬高落在 98%~102%）
+    """
+    _validate_slide_index(document.prs, slide_index)
+
+    notes: List[str] = []
+    slide = document.prs.slides[slide_index]
+    slide_width = int(document.prs.slide_width)
+    slide_height = int(document.prs.slide_height)
+    tolerance = 0.02
+
+    best_candidate: Optional[Dict[str, Any]] = None
+
+    for shape_index, shape in enumerate(slide.shapes):
+        if not hasattr(shape, "image"):
+            continue
+
+        try:
+            left = int(shape.left)
+            top = int(shape.top)
+            width = int(shape.width)
+            height = int(shape.height)
+        except Exception:
+            continue
+
+        x_ok = abs(left) <= max(1, int(slide_width * tolerance))
+        y_ok = abs(top) <= max(1, int(slide_height * tolerance))
+        w_ok = abs(width - slide_width) <= max(1, int(slide_width * tolerance))
+        h_ok = abs(height - slide_height) <= max(1, int(slide_height * tolerance))
+        if not (x_ok and y_ok and w_ok and h_ok):
+            continue
+
+        score = (
+            abs(left) / max(1, slide_width)
+            + abs(top) / max(1, slide_height)
+            + abs(width - slide_width) / max(1, slide_width)
+            + abs(height - slide_height) / max(1, slide_height)
+        )
+
+        image_ref = None
+        image_path_hint = None
+
+        try:
+            image_path_hint = getattr(shape.image, "filename", None)
+        except Exception:
+            image_path_hint = None
+
+        try:
+            blips = shape._element.xpath(
+                ".//a:blip",
+                namespaces={
+                    "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+                    "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+                },
+            )
+            if blips:
+                image_ref = blips[0].get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed")
+        except Exception:
+            image_ref = None
+
+        if image_ref and not image_path_hint:
+            try:
+                rel = slide.part.rels[image_ref]
+                partname = str(rel.target_part.partname)
+                image_path_hint = partname if partname.startswith("/") else f"/{partname}"
+            except Exception:
+                pass
+
+        candidate = {
+            "matched": True,
+            "shape_index": shape_index,
+            "shape_id": getattr(shape, "shape_id", None),
+            "image_ref": image_ref,
+            "image_path_hint": image_path_hint,
+            "by_shape_detection": True,
+            "score": score,
+            "notes": [],
+        }
+
+        if best_candidate is None or score < best_candidate["score"]:
+            best_candidate = candidate
+
+    if best_candidate is None:
+        notes.append("未偵測到滿版圖片 shape。")
+        return {
+            "matched": False,
+            "shape_index": None,
+            "shape_id": None,
+            "image_ref": None,
+            "image_path_hint": None,
+            "by_shape_detection": False,
+            "notes": notes,
+        }
+
+    notes.append(
+        f"偵測到候選滿版圖片 shape(index={best_candidate['shape_index']}, id={best_candidate['shape_id']})。"
+    )
+    best_candidate["notes"] = notes
+    best_candidate.pop("score", None)
+    return best_candidate
+
+
+def get_presentation_theme_info(document: PPTDocument) -> Dict[str, Any]:
+    """
+    讀取簡報整體 theme / 佈景主題資訊。
+
+    預期欄位（issues 規格）：
+    - file_path, slide_count, has_theme, theme_part_name, theme_name,
+      color_scheme, font_scheme, slide_master_count, notes
+
+    注意：
+    - 優先讀取真實 theme XML，不足處才以 notes 說明
+    - 單一欄位讀不到不可使整體失敗
+    """
+    import zipfile
+
+    _ensure_pptx_available()
+
+    try:
+        slide_count = len(document.prs.slides)
+    except Exception:
+        slide_count = 0
+
+    try:
+        slide_master_count = len(document.prs.slide_masters)
+    except Exception:
+        slide_master_count = 0
+
+    result: Dict[str, Any] = {
+        "file_path": document.file_path,
+        "slide_count": slide_count,
+        "has_theme": False,
+        "theme_part_name": None,
+        "theme_name": None,
+        "color_scheme": {},
+        "font_scheme": {},
+        "slide_master_count": slide_master_count,
+        "notes": [],
+    }
+
+    try:
+        part_info = _get_theme_part_info(document)
+    except Exception as exc:
+        result["notes"].append(f"_get_theme_part_info 失敗: {exc}")
+        return result
+
+    result["has_theme"] = bool(part_info.get("has_theme"))
+    result["theme_part_name"] = part_info.get("theme_part_name")
+    if part_info.get("slide_master_count") is not None:
+        result["slide_master_count"] = part_info.get("slide_master_count")
+    result["notes"].extend(part_info.get("notes", []))
+
+    theme_part_name = result.get("theme_part_name")
+    file_path = result.get("file_path")
+
+    if not theme_part_name:
+        return result
+
+    if not file_path:
+        result["notes"].append("document.file_path 為空，無法從 pptx zip 讀取 theme XML。")
+        return result
+
+    if not os.path.exists(file_path):
+        result["notes"].append(f"找不到 PPTX 檔案，無法讀取 theme XML: {file_path}")
+        return result
+
+    zip_name = str(theme_part_name).lstrip("/")
+    try:
+        with zipfile.ZipFile(file_path, "r") as zf:
+            if zip_name not in zf.namelist():
+                result["notes"].append(f"在壓縮包中找不到 theme part: {zip_name}")
+                return result
+            theme_xml_bytes = zf.read(zip_name)
+    except Exception as exc:
+        result["notes"].append(f"讀取 theme XML 失敗: {exc}")
+        return result
+
+    parsed = _parse_theme_xml(theme_xml_bytes)
+    result["theme_name"] = parsed.get("theme_name")
+    result["color_scheme"] = parsed.get("color_scheme", {})
+    result["font_scheme"] = parsed.get("font_scheme", {})
+    result["notes"].extend(parsed.get("notes", []))
+    return result
+
+
+def get_slide_background_info(document: PPTDocument, slide_index: int) -> Dict[str, Any]:
+    """
+    讀取單頁投影片背景資訊。
+
+    background_type 可能值：inherit, solid, picture, shape_picture_simulated, unknown
+
+    預期欄位（issues 規格）：
+    - slide_index, background_type, source, color_rgb, image_ref, image_path_hint,
+      by_shape_detection, notes
+
+    判斷策略：
+    - 優先使用 slide XML 背景訊號（避免只靠 shape 猜測）
+    - 若偵測到滿版圖片 shape，再標示 shape_picture_simulated
+    - 無法確定時回傳 unknown 並在 notes 說明依據不足
+    """
+    _ensure_pptx_available()
+    _validate_slide_index(document.prs, slide_index)
+
+    result: Dict[str, Any] = {
+        "slide_index": slide_index,
+        "background_type": "unknown",
+        "source": "unresolved",
+        "color_rgb": None,
+        "image_ref": None,
+        "image_path_hint": None,
+        "by_shape_detection": False,
+        "notes": [],
+    }
+
+    xml_info = _get_slide_background_xml_info(document, slide_index)
+    for key in ("background_type", "source", "color_rgb", "image_ref", "image_path_hint", "by_shape_detection"):
+        if key in xml_info:
+            result[key] = xml_info[key]
+    result["notes"].extend(xml_info.get("notes", []))
+
+    shape_info = _detect_full_slide_picture_shape(document, slide_index)
+    result["notes"].extend(shape_info.get("notes", []))
+
+    if shape_info.get("matched"):
+        if result["background_type"] in ("inherit", "unknown"):
+            result["background_type"] = "shape_picture_simulated"
+            result["source"] = "shape_detection"
+            result["by_shape_detection"] = True
+        if not result.get("image_ref"):
+            result["image_ref"] = shape_info.get("image_ref")
+        if not result.get("image_path_hint"):
+            result["image_path_hint"] = shape_info.get("image_path_hint")
+
+    valid_types = {"inherit", "solid", "picture", "shape_picture_simulated", "unknown"}
+    if result["background_type"] not in valid_types:
+        result["notes"].append(f"偵測到未定義背景類型: {result['background_type']}，已回退為 unknown。")
+        result["background_type"] = "unknown"
+
+    return result
+
+
+def scan_presentation_backgrounds(document: PPTDocument) -> Dict[str, Any]:
+    """
+    掃描整份簡報每一頁背景。
+
+    回傳：file_path, slide_count, theme_info（get_presentation_theme_info 結果）,
+    slides（每頁為 get_slide_background_info 結果）
+    """
+    _ensure_pptx_available()
+
+    slide_count = len(document.prs.slides)
+    theme_info = get_presentation_theme_info(document)
+    slides: List[Dict[str, Any]] = []
+
+    for i in range(slide_count):
+        try:
+            slides.append(get_slide_background_info(document, i))
+        except Exception as exc:
+            slides.append(
+                {
+                    "slide_index": i,
+                    "background_type": "unknown",
+                    "source": "scan_exception",
+                    "color_rgb": None,
+                    "image_ref": None,
+                    "image_path_hint": None,
+                    "by_shape_detection": False,
+                    "notes": [f"掃描失敗: {exc}"],
+                }
+            )
+
+    return {
+        "file_path": document.file_path,
+        "slide_count": slide_count,
+        "theme_info": theme_info,
+        "slides": slides,
+    }
 
 
 def delete_slide(document: PPTDocument, slide_index: int) -> Dict[str, Any]:
