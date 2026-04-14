@@ -1,0 +1,683 @@
+{
+  "generated_at": "2026-04-14T15:45:41.069252",
+  "base_url": "http://10.1.3.127:7017",
+  "provider": "openai",
+  "model": "gpt35_chat",
+  "templates_dirs": [],
+  "input_files": [
+    "C:\\ML_HOME\\PPTStudio\\api_server.py",
+    "C:\\ML_HOME\\PPTStudio\\dataProcess\\__init__.py",
+    "C:\\ML_HOME\\PPTStudio\\dataProcess\\ppt_stdio.py",
+    "C:\\ML_HOME\\PPTStudio\\mcp_server.py",
+    "C:\\ML_HOME\\PPTStudio\\PPTStudio.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp_io\\test_all_simple.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp_io\\test_new.py"
+  ],
+  "files": {
+    "C:\\ML_HOME\\PPTStudio\\api_server.py": {
+      "path": "C:\\ML_HOME\\PPTStudio\\api_server.py",
+      "functions": [
+        {
+          "name": "_load_server_config",
+          "docstring": "",
+          "summary": "該函數的目的是加載伺服器配置文件，從config.json文件中讀取配置信息並返回為字典類型。"
+        },
+        {
+          "name": "_ok",
+          "docstring": "",
+          "summary": "這個函數返回一個包含成功訊息和數據的字典。"
+        },
+        {
+          "name": "_err_to_http",
+          "docstring": "",
+          "summary": "這個函數將錯誤轉換為HTTP例外，並返回500狀態碼，包含錯誤訊息和追蹤資訊。"
+        },
+        {
+          "name": "root",
+          "docstring": "",
+          "summary": "該函數返回一個包含服務名稱和版本號的字典。"
+        },
+        {
+          "name": "health",
+          "docstring": "",
+          "summary": "該函數返回一個包含健康狀態的字典。"
+        },
+        {
+          "name": "create_new_ppt",
+          "docstring": "",
+          "summary": "創建新的PPT文件，根據請求中的參數設置文件屬性，並返回成功建立的PPT文件路徑、相關信息和幻燈片清單。"
+        },
+        {
+          "name": "ppt_info",
+          "docstring": "",
+          "summary": "這個函數的目的是從指定的檔案路徑中獲取簡報的資訊，並將其轉換為HTTP回應。"
+        },
+        {
+          "name": "ppt_slides",
+          "docstring": "",
+          "summary": "該函數用於從指定文件路徑讀取幻燈片並返回幻燈片清單。"
+        },
+        {
+          "name": "ppt_save_as",
+          "docstring": "",
+          "summary": "這個函數的目的是接收一個保存請求，將指定的演示文稿另存為指定格式，並返回成功訊息和新檔案路徑。"
+        },
+        {
+          "name": "ppt_add_blank_slide",
+          "docstring": "",
+          "summary": "這個函數的目的是在PPT中新增一張空白頁。"
+        },
+        {
+          "name": "ppt_add_blank_slides",
+          "docstring": "",
+          "summary": "該函數的目的是在PPT中新增多頁空白頁。"
+        },
+        {
+          "name": "ppt_add_text",
+          "docstring": "",
+          "summary": "這個函數的目的是在PPT中新增文字，並返回包含結果信息的字典。"
+        },
+        {
+          "name": "ppt_add_image",
+          "docstring": "",
+          "summary": "該函數的目的是將圖片新增至簡報中，並返回新增後的簡報路徑和相關信息。"
+        },
+        {
+          "name": "ppt_add_table",
+          "docstring": "",
+          "summary": "該函數的目的是在幻燈片中新增一個表格，並返回處理結果和相關信息。"
+        },
+        {
+          "name": "ppt_add_shape",
+          "docstring": "",
+          "summary": "此函數的目的是在幻燈片中新增形狀，並返回新增形狀的結果和相關信息。"
+        },
+        {
+          "name": "ppt_add_line",
+          "docstring": "",
+          "summary": "該函數的目的是在幻燈片中新增一條線段，並返回操作結果和相關信息。"
+        },
+        {
+          "name": "ppt_add_arrow",
+          "docstring": "",
+          "summary": "該函數的目的是向演示文稿中新增箭頭，並返回新增箭頭的結果和相關信息。"
+        },
+        {
+          "name": "ppt_delete_slide",
+          "docstring": "",
+          "summary": "此函數的目的是刪除幻燈片，並返回操作結果和相關信息。"
+        },
+        {
+          "name": "ppt_duplicate_slide",
+          "docstring": "",
+          "summary": "此函數的目的是複製幻燈片，並返回相關資訊，包括複製後的幻燈片清單。"
+        },
+        {
+          "name": "ppt_replace_text",
+          "docstring": "",
+          "summary": "該函數的目的是替換 PowerPoint 文件中的文本。"
+        },
+        {
+          "name": "ppt_add_bullets",
+          "docstring": "",
+          "summary": "該函數的目的是向幻燈片中添加項目符號，並返回處理結果和相關信息。"
+        },
+        {
+          "name": "ppt_add_title_slide",
+          "docstring": "",
+          "summary": "該函數的目的是在PPT中新增一個標題頁。"
+        },
+        {
+          "name": "ppt_reorder_slides",
+          "docstring": "",
+          "summary": "這個函數的目的是重新排列幻燈片，並返回處理後的幻燈片檔案路徑和相關資訊。"
+        },
+        {
+          "name": "ppt_set_slides_background_color",
+          "docstring": "",
+          "summary": "該函數的目的是設定幻燈片的背景顏色，並返回處理結果和相關信息。"
+        },
+        {
+          "name": "ppt_set_slides_background_image",
+          "docstring": "",
+          "summary": "該函數的目的是設定幻燈片的背景圖片，並返回處理結果和相關信息。"
+        },
+        {
+          "name": "ppt_set_slide_background_color",
+          "docstring": "",
+          "summary": "該函數的目的是設定幻燈片的背景顏色。"
+        },
+        {
+          "name": "ppt_set_slide_background_image",
+          "docstring": "",
+          "summary": "該函數的目的是設定幻燈片的背景圖片。"
+        },
+        {
+          "name": "ppt_render_slide_to_image",
+          "docstring": "",
+          "summary": "該函數的目的是將投影片轉換為圖像。"
+        },
+        {
+          "name": "ppt_render_slides_to_grid_image",
+          "docstring": "",
+          "summary": "該函數的目的是將幻燈片渲染為網格圖像，並返回成功消息。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\PPTStudio\\dataProcess\\ppt_stdio.py": {
+      "path": "C:\\ML_HOME\\PPTStudio\\dataProcess\\ppt_stdio.py",
+      "functions": [
+        {
+          "name": "_ensure_pptx_available",
+          "docstring": "",
+          "summary": "確保python-pptx可用，若未安裝則引發ImportError。"
+        },
+        {
+          "name": "_px_to_emu",
+          "docstring": "",
+          "summary": "這個函數將像素轉換為EMUs（Enhanced Metafile Units），並根據提供的DPI（每英寸點數）進行轉換。"
+        },
+        {
+          "name": "_normalize_file_path",
+          "docstring": "",
+          "summary": "這個函數的目的是將檔案路徑標準化，確保檔案路徑以\".pptx\"結尾。如果檔案路徑為空，則會拋出ValueError。"
+        },
+        {
+          "name": "_ensure_parent_dir",
+          "docstring": "",
+          "summary": "該函數的目的是確保文件的父目錄存在。如果父目錄不存在，則創建父目錄。"
+        },
+        {
+          "name": "_get_blank_layout",
+          "docstring": "",
+          "summary": "此函數用於獲取 PowerPoint 簡報中的空白版面，通常是第6個版面。如果模板不同，則返回最後一個版面。"
+        },
+        {
+          "name": "_remove_all_slides",
+          "docstring": "清空簡報中所有投影片",
+          "summary": "這個函數的目的是清空簡報中所有的投影片。"
+        },
+        {
+          "name": "_validate_slide_index",
+          "docstring": "",
+          "summary": "此函數用於驗證幻燈片索引是否在有效範圍內，若超出範圍則拋出IndexError。"
+        },
+        {
+          "name": "_rgb_tuple_to_color",
+          "docstring": "",
+          "summary": "這個函數的目的是將 RGB 顏色元組轉換為 RGBColor 物件。如果輸入的 RGB 元組為空或長度不為 3，則會拋出 ValueError 錯誤。"
+        },
+        {
+          "name": "_load_pptstudio_config",
+          "docstring": "",
+          "summary": "此函數的目的是加載PPT Studio的配置文件，如果配置文件存在則返回其內容，否則返回空字典。"
+        },
+        {
+          "name": "_contains_cjk",
+          "docstring": "",
+          "summary": "此函數用於檢查文本中是否包含中日韓字符。"
+        },
+        {
+          "name": "_get_default_fonts",
+          "docstring": "",
+          "summary": "此函數用於獲取預設字體。返回一個包含中文和英文預設字體的元組。"
+        },
+        {
+          "name": "_looks_like_font_path",
+          "docstring": "",
+          "summary": "該函數用於檢查輸入是否看起來像是字型檔案的路徑。"
+        },
+        {
+          "name": "_resolve_font_name",
+          "docstring": "",
+          "summary": "這個函數的目的是解析字型名稱，如果提供的字型名稱是有效的字型檔案路徑，則返回該字型檔案的家族名稱；如果提供的字型名稱不是有效的字型檔案路徑，則返回字型名稱本身。"
+        },
+        {
+          "name": "__init__",
+          "docstring": "",
+          "summary": "這個函數是用來初始化一個PPTDocument物件，設定其簡報物件和檔案路徑。"
+        },
+        {
+          "name": "slide_count",
+          "docstring": "",
+          "summary": "這個函數的目的是返回 PPT 文件中幻燈片的數量。該函數通過計算 self.prs.slides 的長度來實現。"
+        },
+        {
+          "name": "save",
+          "docstring": "",
+          "summary": "這個函數的目的是將 PPT 文件儲存到指定的檔案路徑，如果未提供檔案路徑則會拋出 ValueError 錯誤。"
+        },
+        {
+          "name": "add_blank_slide",
+          "docstring": "",
+          "summary": "此函數在PPTDocument中新增一個空白投影片。"
+        },
+        {
+          "name": "add_blank_slides",
+          "docstring": "",
+          "summary": "該函數用於在PPT文檔中添加空白幻燈片，可以指定添加的幻燈片數量。"
+        },
+        {
+          "name": "add_textbox",
+          "docstring": "",
+          "summary": "這個函數的目的是在指定投影片上新增一個文字框，可以設定文字內容、位置、大小、字型等屬性。"
+        },
+        {
+          "name": "add_image",
+          "docstring": "",
+          "summary": "該函數的目的是在幻燈片中添加圖片，並可以控制圖片的位置、大小和保持長寬比。"
+        },
+        {
+          "name": "add_table",
+          "docstring": "",
+          "summary": "該函數的目的是在指定的投影片上添加一個表格，可以設置表格的行數、列數、位置、大小和內容。如果指定了表格的內容，則可以將數據填充到表格中，並可以選擇將首行作為標題。"
+        },
+        {
+          "name": "add_shape",
+          "docstring": "",
+          "summary": "此函數用於在指定投影片上新增形狀，可以設定形狀的類型、位置、大小、填充顏色、邊框顏色等屬性。"
+        },
+        {
+          "name": "add_line",
+          "docstring": "",
+          "summary": "此函數用於在指定投影片上新增一條直線，可以設定線的顏色和寬度。"
+        },
+        {
+          "name": "add_arrow",
+          "docstring": "",
+          "summary": "該函數的目的是在幻燈片上添加箭頭形狀，可以指定箭頭的方向、文本、填充顏色等屬性。"
+        },
+        {
+          "name": "set_slide_background_color",
+          "docstring": "設定指定頁的純色背景",
+          "summary": "設定指定頁的純色背景。"
+        },
+        {
+          "name": "set_slide_background_image",
+          "docstring": "用滿版圖片模擬投影片背景",
+          "summary": "這個函數的目的是使用全版圖片來模擬投影片的背景。"
+        },
+        {
+          "name": "set_slides_background_color",
+          "docstring": "",
+          "summary": "設定指定投影片的背景顏色。接受投影片索引和RGB顏色作為輸入，並返回包含結果的字典列表。"
+        },
+        {
+          "name": "set_slides_background_image",
+          "docstring": "",
+          "summary": "設置幻燈片背景圖像的功能。接受幻燈片索引和圖像路徑，將圖像設置為指定幻燈片的背景。返回一個包含設置結果的字典列表。"
+        },
+        {
+          "name": "get_info",
+          "docstring": "",
+          "summary": "該函數返回包含PPT文件信息的字典，包括文件路径、幻灯片数量、幻灯片尺寸和布局数量。"
+        },
+        {
+          "name": "list_slides",
+          "docstring": "",
+          "summary": "此函數用於列出幻燈片中的形狀資訊，包括形狀ID、名稱、類型和文字內容預覽。"
+        },
+        {
+          "name": "delete_slide",
+          "docstring": "",
+          "summary": "此函數用於刪除幻燈片，接受幻燈片索引作為參數，並返回刪除後的結果。"
+        },
+        {
+          "name": "duplicate_slide",
+          "docstring": "",
+          "summary": "該函數的目的是複製幻燈片，包括形狀和背景，並返回相關信息，如原始幻燈片索引、新幻燈片索引和總幻燈片數。"
+        },
+        {
+          "name": "replace_text",
+          "docstring": "",
+          "summary": "此函數的目的是在PPT文件中替換文本。根據提供的參數，將指定的文本替換為新文本，可以選擇是否區分大小寫和精確匹配。"
+        },
+        {
+          "name": "add_bullets",
+          "docstring": "",
+          "summary": "該函數用於在指定投影片中添加項目符號清單，可以設定位置、大小、字體等屬性。"
+        },
+        {
+          "name": "add_title_slide",
+          "docstring": "",
+          "summary": "此函數的目的是在PPT文件中添加標題幻燈片，可以包含標題和副標題。該函數會尋找合適的佈局並添加標題和副標題到幻燈片中。"
+        },
+        {
+          "name": "reorder_slides",
+          "docstring": "",
+          "summary": "這個函數的目的是重新排列幻燈片，根據提供的新順序。函數會檢查新順序的合法性，然後重新排列幻燈片。"
+        },
+        {
+          "name": "new",
+          "docstring": "建立新的 pptx 檔案\n\nArgs:\n    file_path: 輸出檔案路徑\n    plank_page_num: 頁面數量\n    plank_page_width: 頁面寬度（px）\n    plank_page_height: 頁面高度（px）\n    dpi: 像素轉尺寸時使用的 DPI\n\nReturns:\n    str: 建立後的檔案路徑",
+          "summary": "建立新的 pptx 檔案，並返回建立後的檔案路徑。接受輸出檔案路徑、頁面數量、頁面寬度、頁面高度和 DPI 作為參數。"
+        },
+        {
+          "name": "new_document",
+          "docstring": "",
+          "summary": "新建一個 PowerPoint 文件，可以指定頁面數量、寬度和高度。"
+        },
+        {
+          "name": "open_presentation",
+          "docstring": "",
+          "summary": "此函數用於打開 PowerPoint 檔案並返回 PPTDocument 物件。如果檔案不存在，則會拋出 FileNotFoundError 錯誤。"
+        },
+        {
+          "name": "save",
+          "docstring": "",
+          "summary": "這個函數的目的是保存PPT文件到指定路徑。"
+        },
+        {
+          "name": "add_blank_slide",
+          "docstring": "",
+          "summary": "這個函數在PPT文件中新增一個空白投影片。"
+        },
+        {
+          "name": "add_blank_slides",
+          "docstring": "",
+          "summary": "該函數用於在PPT文件中添加空白幻燈片。"
+        },
+        {
+          "name": "add_text",
+          "docstring": "",
+          "summary": "這個函數的目的是在指定的 PPT 文件的特定幻燈片上添加文本框，可以設定文本的內容、位置、大小、字體等屬性。"
+        },
+        {
+          "name": "add_image",
+          "docstring": "",
+          "summary": "此函數用於在指定投影片中添加圖像。接受文件、投影片索引、圖像路徑、位置和大小等參數，並返回包含操作結果的字典。"
+        },
+        {
+          "name": "add_table",
+          "docstring": "",
+          "summary": "該函數用於在指定的 PPT 文檔中的指定幻燈片上添加一個表格，可以指定表格的行數、列數、位置、大小和數據。"
+        },
+        {
+          "name": "add_shape",
+          "docstring": "",
+          "summary": "該函數用於在指定的投影片中添加形狀到文件中。接受多個參數，包括形狀類型、位置、大小、文本內容和樣式設置。"
+        },
+        {
+          "name": "add_line",
+          "docstring": "",
+          "summary": "該函數用於在指定投影片上添加一條線條，可以指定線條的起點、終點、顏色和寬度。"
+        },
+        {
+          "name": "add_arrow",
+          "docstring": "",
+          "summary": "該函數用於在幻燈片上添加箭頭形狀，可以指定箭頭的位置、大小、方向和文本等屬性。"
+        },
+        {
+          "name": "get_info",
+          "docstring": "",
+          "summary": "該函數的目的是從PPT文件中獲取信息並返回一個包含該信息的字典。"
+        },
+        {
+          "name": "list_slides",
+          "docstring": "",
+          "summary": "該函數的目的是列出給定演示文稿中的所有幻燈片。"
+        },
+        {
+          "name": "set_slide_background_color",
+          "docstring": "",
+          "summary": "這個函數的目的是設置幻燈片的背景顏色。接受一個 PPT 文件、幻燈片索引和 RGB 顏色值，並將背景顏色設置為指定的 RGB 值。"
+        },
+        {
+          "name": "set_slide_background_image",
+          "docstring": "",
+          "summary": "設置幻燈片背景圖像。接收演示文稿、幻燈片索引和圖像路徑，將圖像設置為指定幻燈片的背景。"
+        },
+        {
+          "name": "delete_slide",
+          "docstring": "",
+          "summary": "該函數的目的是刪除幻燈片。"
+        },
+        {
+          "name": "duplicate_slide",
+          "docstring": "",
+          "summary": "這個函數的目的是複製指定投影片到同一份文件中。"
+        },
+        {
+          "name": "replace_text",
+          "docstring": "",
+          "summary": "此函數的目的是替換 PowerPoint 文件中的文本。"
+        },
+        {
+          "name": "add_bullets",
+          "docstring": "",
+          "summary": "該函數用於在指定幻燈片上添加項目符號。接受幻燈片索引、項目列表和其他格式設置作為參數，並將項目符號添加到指定位置。"
+        },
+        {
+          "name": "add_title_slide",
+          "docstring": "",
+          "summary": "這個函數的目的是在PPT文件中添加標題幻燈片。"
+        },
+        {
+          "name": "reorder_slides",
+          "docstring": "",
+          "summary": "此函數用於重新排序幻燈片，接受幻燈片文件和新的排序順序，並返回重新排序後的幻燈片文件。"
+        },
+        {
+          "name": "set_slides_background_color",
+          "docstring": "",
+          "summary": "該函數用於設置幻燈片的背景顏色。接受幻燈片文檔、幻燈片索引和RGB顏色作為輸入，並返回包含設置結果的字典列表。"
+        },
+        {
+          "name": "set_slides_background_image",
+          "docstring": "",
+          "summary": "該函數用於設置幻燈片的背景圖像。接受幻燈片文檔、幻燈片索引和圖像路徑作為參數，並返回一個包含字典的列表。"
+        },
+        {
+          "name": "_find_libreoffice_executable",
+          "docstring": "尋找 LibreOffice / soffice 可執行檔",
+          "summary": "尋找 LibreOffice / soffice 可執行檔。"
+        },
+        {
+          "name": "convert_pptx_to_pdf",
+          "docstring": "用 LibreOffice headless 將 PPTX 轉成 PDF",
+          "summary": "使用 LibreOffice headless 将 PPTX 转换为 PDF。"
+        },
+        {
+          "name": "render_slide_to_image",
+          "docstring": "將指定頁投影片輸出成圖片\n- 先轉 PDF\n- 再用 PyMuPDF 將指定頁 rasterize 成 png",
+          "summary": "該函數用於將指定投影片轉換為圖片，首先將投影片轉換為 PDF，然後使用 PyMuPDF 將指定頁面轉換為 PNG 格式。"
+        },
+        {
+          "name": "render_slides_to_grid_image",
+          "docstring": "將多頁投影片輸出並拼成一張 grid 圖",
+          "summary": "將多頁投影片輸出並拼成一張 grid 圖。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\PPTStudio\\mcp_server.py": {
+      "path": "C:\\ML_HOME\\PPTStudio\\mcp_server.py",
+      "functions": [
+        {
+          "name": "set_runtime_config",
+          "docstring": "",
+          "summary": "設定運行配置，將 API 基礎路徑和超時時間設置為全局變量。"
+        },
+        {
+          "name": "_request",
+          "docstring": "",
+          "summary": "此函數用於發送 HTTP 請求至指定路徑，並返回相應的 JSON 數據或錯誤信息。"
+        },
+        {
+          "name": "_clean_rgb",
+          "docstring": "",
+          "summary": "此函數用於檢查並清理RGB顏色值，確保每個值介於0到255之間，並返回清理後的顏色值列表。"
+        },
+        {
+          "name": "health",
+          "docstring": "檢查底層 PPT API server 是否存活。",
+          "summary": "檢查底層 PPT API server 是否存活。"
+        },
+        {
+          "name": "root_info",
+          "docstring": "取得底層 PPT API server 的基本資訊。",
+          "summary": "取得底層 PPT API server 的基本資訊。"
+        },
+        {
+          "name": "new_presentation",
+          "docstring": "建立新的 PPTX 檔案。",
+          "summary": "建立新的 PPTX 檔案。"
+        },
+        {
+          "name": "get_presentation_info",
+          "docstring": "讀取 PPT 基本資訊。",
+          "summary": "該函數用於讀取PPT文件的基本資訊。"
+        },
+        {
+          "name": "list_presentation_slides",
+          "docstring": "列出所有投影片與 shape 摘要。",
+          "summary": "該函數的目的是列出指定檔案中所有投影片的摘要資訊。"
+        },
+        {
+          "name": "save_as",
+          "docstring": "另存 PPT 到新路徑。",
+          "summary": "該函數的目的是將PPT另存到新路徑。"
+        },
+        {
+          "name": "add_blank_slide",
+          "docstring": "新增一張空白投影片。",
+          "summary": "新增一張空白投影片。"
+        },
+        {
+          "name": "add_blank_slides",
+          "docstring": "新增多張空白投影片。",
+          "summary": "新增多張空白投影片。"
+        },
+        {
+          "name": "add_text",
+          "docstring": "在指定投影片加入文字方塊。",
+          "summary": "在指定投影片加入文字方塊。"
+        },
+        {
+          "name": "add_image",
+          "docstring": "在指定投影片加入圖片。",
+          "summary": "該函數的目的是在指定投影片中加入圖片。"
+        },
+        {
+          "name": "add_table",
+          "docstring": "在指定投影片加入表格。",
+          "summary": "在指定投影片加入表格。"
+        },
+        {
+          "name": "add_shape",
+          "docstring": "在指定投影片加入一般圖形，例如 rect / ellipse / diamond。",
+          "summary": "在指定投影片加入一般圖形，例如 rect / ellipse / diamond。"
+        },
+        {
+          "name": "add_line",
+          "docstring": "在指定投影片加入直線。",
+          "summary": "在指定投影片加入直線。"
+        },
+        {
+          "name": "add_arrow",
+          "docstring": "在指定投影片加入箭頭圖形。",
+          "summary": "該函數在指定投影片中添加箭頭圖形。"
+        },
+        {
+          "name": "delete_slide",
+          "docstring": "刪除指定投影片。",
+          "summary": "該函數的目的是刪除指定投影片。"
+        },
+        {
+          "name": "duplicate_slide",
+          "docstring": "複製指定投影片。",
+          "summary": "該函數的目的是複製指定投影片。"
+        },
+        {
+          "name": "replace_text",
+          "docstring": "在整份或指定投影片中取代文字。",
+          "summary": "這個函數的目的是在整份或指定投影片中取代文字。"
+        },
+        {
+          "name": "add_bullets",
+          "docstring": "在指定投影片加入項目符號清單。",
+          "summary": "在指定投影片加入項目符號清單。"
+        },
+        {
+          "name": "add_title_slide",
+          "docstring": "新增標題頁。",
+          "summary": "新增標題頁。"
+        },
+        {
+          "name": "reorder_slides",
+          "docstring": "重新排列投影片順序。",
+          "summary": "這個函數的目的是重新排列投影片的順序。"
+        },
+        {
+          "name": "set_slide_background_color",
+          "docstring": "設定單頁背景顏色。",
+          "summary": "設定單頁背景顏色。"
+        },
+        {
+          "name": "set_slide_background_image",
+          "docstring": "設定單頁背景圖片。",
+          "summary": "設定單頁背景圖片。"
+        },
+        {
+          "name": "set_slides_background_color",
+          "docstring": "設定多頁背景顏色。",
+          "summary": "設定多頁背景顏色。"
+        },
+        {
+          "name": "set_slides_background_image",
+          "docstring": "設定多頁背景圖片。",
+          "summary": "設定多頁背景圖片。"
+        },
+        {
+          "name": "render_slide_to_image",
+          "docstring": "把指定投影片輸出成單張圖片。",
+          "summary": "將指定投影片轉換為單張圖片的功能。"
+        },
+        {
+          "name": "render_slides_to_grid_image",
+          "docstring": "把多頁投影片輸出成 grid 拼圖。",
+          "summary": "將多頁投影片輸出成 grid 拼圖。"
+        },
+        {
+          "name": "main",
+          "docstring": "",
+          "summary": "這個函數是用來啟動MCP伺服器，根據參數設定不同的傳輸方式和設定。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\PPTStudio\\tmp_io\\test_all_simple.py": {
+      "path": "C:\\ML_HOME\\PPTStudio\\tmp_io\\test_all_simple.py",
+      "functions": [
+        {
+          "name": "print_title",
+          "docstring": "",
+          "summary": "這個函數用來印出標題，標題文字會被放在上下各一行的分隔線之間。"
+        },
+        {
+          "name": "print_result",
+          "docstring": "",
+          "summary": "這個函數的目的是根據輸入的名稱和結果，打印出一條消息，如果結果是字典或列表，則以更易讀的方式打印出來。"
+        },
+        {
+          "name": "ensure_dir",
+          "docstring": "",
+          "summary": "該函數確保指定路徑存在，如果不存在則創建該路徑。"
+        },
+        {
+          "name": "make_demo_image",
+          "docstring": "",
+          "summary": "這個函數的目的是創建一個示範圖像，可以設定圖像的路徑、大小、文字內容、背景色和前景色。"
+        },
+        {
+          "name": "safe_call",
+          "docstring": "",
+          "summary": "這個函數名為safe_call，用於安全地執行其他函數，並處理可能的異常情況。"
+        },
+        {
+          "name": "main",
+          "docstring": "",
+          "summary": "此函數的目的是初始化測試環境，並執行多個測試操作，包括創建圖片、打開演示文稿、獲取信息等。"
+        }
+      ]
+    }
+  }
+}

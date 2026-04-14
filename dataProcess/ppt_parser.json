@@ -1,0 +1,147 @@
+{
+  "generated_at": "2026-04-14T11:25:06.352767",
+  "base_url": "http://10.1.3.127:7017",
+  "provider": "openai",
+  "model": "gpt35_chat",
+  "templates_dirs": [],
+  "input_files": [
+    "C:\\ML_HOME\\DocumentManagerQAS\\src\\ContextParser\\ppt_parser.py"
+  ],
+  "files": {
+    "C:\\ML_HOME\\DocumentManagerQAS\\src\\ContextParser\\ppt_parser.py": {
+      "path": "C:\\ML_HOME\\DocumentManagerQAS\\src\\ContextParser\\ppt_parser.py",
+      "functions": [
+        {
+          "name": "_setup_logger",
+          "docstring": "設定日誌",
+          "summary": "設定日誌。"
+        },
+        {
+          "name": "_table_to_markdown",
+          "docstring": "將表格數據轉換為 Markdown 格式\n\nArgs:\n    table_data: 表格數據，每個元素是一行（列表）\n\nReturns:\n    Markdown 格式的表格字符串",
+          "summary": "該函數的目的是將表格數據轉換為 Markdown 格式的字符串。"
+        },
+        {
+          "name": "_table_to_text",
+          "docstring": "將表格數據轉換為純文字格式\n\nArgs:\n    table_data: 表格數據\n\nReturns:\n    純文字格式的表格字符串",
+          "summary": "這個函數的目的是將表格數據轉換為純文字格式的表格字符串。"
+        },
+        {
+          "name": "_format_table_by_format",
+          "docstring": "依照格式輸出表格內容\n\nArgs:\n    table_data: 表格資料\n    format_type: 'markdown', 'text', 'placeholder'\n    table_id: 表格 ID\n\nReturns:\n    str: 表格文字或佔位符",
+          "summary": "根据指定格式输出表格内容。"
+        },
+        {
+          "name": "_make_table_placeholder",
+          "docstring": "建立表格佔位符字串",
+          "summary": "這個函數的目的是建立表格佔位符字串，根據傳入的表格ID。"
+        },
+        {
+          "name": "_make_image_placeholder",
+          "docstring": "建立圖像佔位符字串",
+          "summary": "該函數的目的是建立圖像佔位符字串，接受圖像ID作為參數。"
+        },
+        {
+          "name": "_guess_image_mime",
+          "docstring": "統一推斷圖片副檔名與 MIME\n\nPriority:\n1) 明確指定 mime\n2) 明確指定 ext\n3) pptx stream Filter\n4) fallback default\n\nReturns:\n    (ext, mime)",
+          "summary": "該函數的目的是統一推斷圖片的副檔名和MIME類型。根據指定的mime或ext，以及pptx流過濾器，優先推斷mime，其次是ext，然後是流過濾器，最後是默認值。返回推斷出的副檔名和MIME類型。"
+        },
+        {
+          "name": "_pack_image_bytes",
+          "docstring": "統一封裝輸出格式（ext/mime + base64 或 bytes）。",
+          "summary": "該函數的目的是統一封裝輸出格式，可以將圖像數據轉換為指定的擴展名和 MIME 類型，並選擇將其轉換為 base64 字符串或字節。"
+        },
+        {
+          "name": "_extract_image_data_from_ppt",
+          "docstring": "從 PPTX shape 提取圖像資料\n\nArgs:\n    prs: Presentation 物件\n    slide: Slide 物件\n    shape: Shape 物件（必須是 PICTURE 類型）\n    to_base64: 是否轉換為 base64\n    render_dpi: 渲染 DPI（未使用，保留以保持接口一致性）\n\nReturns:\n    Dict[str, Any]: 包含圖像資料的字典",
+          "summary": "該函數的目的是從PPTX形狀中提取圖像資料。"
+        },
+        {
+          "name": "preview",
+          "docstring": "預覽 PPTX 文件內容\n    \n    Args:\n        file_path: PPTX 檔案路徑\n        include_tables: 是否包含表格（預設 True）\n        include_metadata: 是否包含文件元數據（預設 False）\n        separator: 段落分隔符號（預設 '\n\n'）\n        **kwargs: 其他參數\n    \n    Returns:\n        str: 純文字內容",
+          "summary": "該函數的目的是預覽 PPTX 文件的內容，可以選擇是否包含表格和文件元數據，並指定段落分隔符號。"
+        },
+        {
+          "name": "parse",
+          "docstring": "解析 PPTX 文件內容（引用 preview）\n    \n    Args:\n        file_path: PPTX 檔案路徑\n        include_tables: 是否包含表格（預設 True）\n        include_metadata: 是否包含文件元數據（預設 False）\n        separator: 段落分隔符號（預設 '\n\n'）\n        **kwargs: 其他參數\n    \n    Returns:\n        str: 文件內容",
+          "summary": "該函數的目的是解析PPTX文件內容，並返回文件內容。可以選擇是否包含表格和文件元數據，以及自定義段落分隔符號。"
+        },
+        {
+          "name": "process",
+          "docstring": "一條龍處理流程：extract → segment → chunk（省略 preview 以節省流程）\n\nArgs:\n    file_path: 檔案路徑\n    include_tables: 是否包含表格\n    table_format: 表格格式（'markdown', 'text', 'html'）\n    segment_mode: 分段模式（'char_count', 'structure'）\n    suitable_char_count: 合適的字數\n    max_char_multiplier: 最大字數倍數\n    min_char_multiplier: 最小字數倍數\n    separator: 段落之間的連接符號\n    use_advanced_structure: 是否使用進階結構分析\n    consider_page_boundary: 是否考慮頁面邊界\n    llm_provider: LLM 提供者\n    llm_model: LLM 模型\n    llm_base_url: LLM API 的 base URL\n    extract_kw_lbd: 提取關鍵字的最小字數閾值\n    include_images: 是否包含圖像（預設 True）\n    image_llm_provider: 圖像 LLM 提供者\n    image_llm_model: 圖像 LLM 模型\n    image_placeholder: 是否啟用圖像佔位符功能\n    **kwargs: 其他參數\n\nReturns:\n    Dict[str, Any]: 包含以下鍵的字典：\n        - chunks: 最終的 chunk 結果列表\n        - unit_paras: extract 階段的結果\n        - segments: segment 階段的結果\n        - metadata: 元數據\n        - stats: 統計資訊",
+          "summary": "這個函數是一個一條龍處理流程，用於從檔案中提取、分段和組合內容，並返回包含不同階段結果的字典。"
+        },
+        {
+          "name": "_extract_metadata_text_pptx",
+          "docstring": "使用 python-pptx 提取元數據文字",
+          "summary": "使用 python-pptx 提取元数据文字。"
+        },
+        {
+          "name": "extract",
+          "docstring": "提取 PPTX 文件的結構化資訊\n\nArgs:\n    file_path: PPTX 檔案路徑（與 text 二選一）\n    text: 純文字內容（與 file_path 二選一，用於已讀取的內容）\n    include_tables: 是否包含表格（預設 True）\n    table_format: 表格格式（'markdown', 'text', 'placeholder'）\n    use_bookmarks: 是否使用書籤識別標題（預設 True，PPTX 中對應 slide 標題）\n    use_layout_analysis: 是否使用佈局分析（預設 True）\n    page_margin_left: 頁面左邊距（pt，用於計算縮排）\n    indent_unit_pt: 縮排單位（pt，預設 36pt = 1 級）\n    include_images: 是否包含圖像\n    image_placeholder: 是否使用圖像佔位符\n    **kwargs: 其他參數\n\nReturns:\n    Dict[str, Any]: 包含 unit_paras 和 metadata 的字典",
+          "summary": "提取 PPTX 文件的結構化資訊，包括文本、表格、圖像等內容，並提供不同格式選擇和佈局分析功能。"
+        },
+        {
+          "name": "_extract_from_text",
+          "docstring": "從純文字提取（備用方案）",
+          "summary": "該函數的目的是從純文字中提取單元段落，並返回包含單元段落和元數據的字典。"
+        },
+        {
+          "name": "_extract_bookmarks_and_metadata",
+          "docstring": "使用 PPTX 提取書籤和元數據\n\nReturns:\n    Tuple[List[Dict], Dict]: (bookmarks, metadata)",
+          "summary": "該函數的目的是使用PPTX文件提取書籤和元數據。返回一個元組，包含書籤列表和元數據字典。"
+        },
+        {
+          "name": "_match_bookmark",
+          "docstring": "匹配文字與書籤\n\nArgs:\n    line_text: 文字內容\n    bookmarks: 書籤列表\n    slide_num: 當前投影片編號\n\nReturns:\n    Optional[Dict]: 匹配的書籤資訊，如果沒有匹配則返回 None",
+          "summary": "這個函數的目的是匹配文字與書籤，接受文字內容、書籤列表和當前投影片編號作為參數，返回匹配的書籤資訊，如果沒有匹配則返回 None。"
+        },
+        {
+          "name": "_calculate_indent_from_shape",
+          "docstring": "從 shape 位置計算縮排層級\n\nArgs:\n    shape: PPTX shape 物件\n    slide: PPTX slide 物件\n    page_margin_left: 頁面左邊距（pt）\n    indent_unit_pt: 縮排單位（pt）\n\nReturns:\n    int: 縮排層級",
+          "summary": "從 PPTX 形狀位置計算縮排層級，考慮頁面左邊距和縮排單位。"
+        },
+        {
+          "name": "display_metadata_image",
+          "docstring": "",
+          "summary": "這個函數的目的是顯示圖像的數量、格式和大小。"
+        },
+        {
+          "name": "segment",
+          "docstring": "將 unit_paras 合併成 segments\n        \n        Args:\n            unit_paras: extract 返回的 unit_paras 列表\n            suitable_char_count: 目標字數（預設 500）\n            segment_mode: 分段模式（'structure', 'hybrid', 'size'）\n            max_char_multiplier: 最大字數倍數（預設 1.5）\n            min_char_multiplier: 最小字數倍數（預設 0.5）\n            separator: 段落分隔符號（預設 '\n'）\n            use_advanced_structure: 是否使用進階 structure 模式（預設 True）\n                - True: 使用移植自 md_parser 的 _segment_with_structure（包含特殊類型往上合併邏輯；特殊類型含表格/圖像）\n                - False: 使用舊版 _segment_by_structure\n            metadata: 從 extract() 過來的元數據(會有圖像資訊)\n            enable_image_llm: 是否啟用圖像 LLM\n            consider_page_boundary: 是否考慮頁面邊界（預設 True）\n            llm_provider: LLM 提供者\n            llm_model: LLM 模型\n            llm_base_url: LLM API 的 base URL\n            image_context_window: 上下文範圍（字元數，預設 200）\n            max_images_per_batch: 每批次最大圖像數（預設 50）\n            image_prompt_template: 自訂 prompt 模板\n            image_llm_provider: 圖像 LLM 提供者\n            image_llm_model: 圖像 LLM 模型\n            **kwargs: 其他參數\n        \n        Returns:\n            List[Dict[str, Any]]: segments 列表",
+          "summary": "這個函數的目的是將 unit_paras 合併成 segments，可以設定目標字數、分段模式、最大字數倍數等參數。"
+        },
+        {
+          "name": "_segment_with_structure",
+          "docstring": "按照結構分段（移植自 pdf_parser，適配 PPTX 結構）\n\n邏輯：\n- 遇到標題（slide 標題）時開始新段落\n- 合併段落時考慮 indent_level\n- 表格往上找最近的標題並合併\n- 考慮 slide 邊界（類似 PDF 的頁面邊界）\n- 後處理：確保每個 segment 都以標題開頭\n\nArgs:\n    filtered_paras: 段落列表\n    separator: 段落之間的連接符號\n    suitable_char_count: 目標字數\n    consider_page_boundary: 是否考慮 slide 邊界\n\nReturns:\n    List[Dict[str, Any]]: 分段後的段落列表",
+          "summary": "該函數的目的是根據結構對段落進行分段，適配PPTX結構。它根據標題開始新段落，考慮縮進級別，合併表格，並考慮幻燈片邊界，確保每個段落以標題開頭。"
+        },
+        {
+          "name": "_segment_by_size",
+          "docstring": "基於字數的分段策略（簡單版本）\n\nArgs:\n    unit_paras: 段落列表\n    suitable_char_count: 目標字數\n    max_char_multiplier: 最大字數倍數\n    min_char_multiplier: 最小字數倍數\n    separator: 分隔符\n\nReturns:\n    List[Dict[str, Any]]: segments 列表",
+          "summary": "該函數的目的是基於字數的分段策略，將段落列表分成符合特定字數範圍的段落。"
+        },
+        {
+          "name": "chunk",
+          "docstring": "為 segments 提取關鍵字，生成 chunks\n\nArgs:\n    segments: segment 返回的 segments 列表\n    separator: 段落之間的連接符號\n    extract_kw_lbd: 提取關鍵字的最小字數閾值\n    llm_provider: LLM 提供者\n    llm_model: LLM 模型\n    llm_base_url: LLM API 的 base URL\n    metadata: extract 返回的 metadata\n    **kwargs: 其他參數\n\nReturns:\n    List[Dict[str, Any]]: chunks 列表",
+          "summary": "該函數的目的是為了從segments中提取關鍵字，並生成chunks。"
+        },
+        {
+          "name": "_add_pptx_metadata",
+          "docstring": "為 chunk 添加 PPTX 特定元數據\n\nArgs:\n    chunk: 要添加元數據的 chunk\n    metadata: PPTX 的 metadata",
+          "summary": "此函數的目的是為給定的 chunk 添加 PPTX 特定元數據，根據提供的 metadata 中的標題、作者和主題信息來更新 chunk。"
+        },
+        {
+          "name": "_parse_keywords_fallback",
+          "docstring": "備用關鍵字解析方法（當 parse_keywords_from_text 不可用時）",
+          "summary": "這個函數的目的是提供一個備用的關鍵字解析方法，當主要的解析方法無法使用時。該函數會嘗試從輸入中解析關鍵字，並返回最多指定數量的關鍵字列表。"
+        },
+        {
+          "name": "_analyze_images_via_batch",
+          "docstring": "Analyze images via batch LLM using placeholders and context.",
+          "summary": "這個函數的目的是通過批量使用佔位符和上下文來分析圖像。"
+        }
+      ]
+    }
+  }
+}

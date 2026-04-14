@@ -1,0 +1,387 @@
+{
+  "generated_at": "2026-04-14T15:46:00.597626",
+  "base_url": "http://10.1.3.127:7017",
+  "provider": "openai",
+  "model": "gpt35_chat",
+  "templates_dirs": [],
+  "input_files": [
+    "C:\\ML_HOME\\PPTStudio\\api_server.py",
+    "C:\\ML_HOME\\PPTStudio\\dataProcess\\__init__.py",
+    "C:\\ML_HOME\\PPTStudio\\dataProcess\\ppt_stdio.py",
+    "C:\\ML_HOME\\PPTStudio\\mcp_server.py",
+    "C:\\ML_HOME\\PPTStudio\\PPTStudio.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp_io\\test_all_simple.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp_io\\test_new.py"
+  ],
+  "files": {
+    "C:\\ML_HOME\\PPTStudio\\api_server.py": {
+      "path": "C:\\ML_HOME\\PPTStudio\\api_server.py",
+      "endpoints": [
+        {
+          "function": "root",
+          "name": "root",
+          "signature": "root()",
+          "methods": [
+            "GET"
+          ],
+          "path": "/",
+          "full_path": "/",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點回傳 PPT API 伺服器的版本資訊。",
+          "error": null
+        },
+        {
+          "function": "health",
+          "name": "health",
+          "signature": "health()",
+          "methods": [
+            "GET"
+          ],
+          "path": "/health",
+          "full_path": "/health",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於檢查伺服器健康狀態，回傳健康狀態為\"healthy\"。",
+          "error": null
+        },
+        {
+          "function": "create_new_ppt",
+          "name": "create_new_ppt",
+          "signature": "create_new_ppt(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/new",
+          "full_path": "/ppt/new",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於建立新的 PPT 檔案，接收請求後會根據提供的參數建立 PPT 檔案並回傳相關資訊。",
+          "error": null
+        },
+        {
+          "function": "ppt_info",
+          "name": "ppt_info",
+          "signature": "ppt_info(file_path)",
+          "methods": [
+            "GET"
+          ],
+          "path": "/ppt/info",
+          "full_path": "/ppt/info",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此API端點用於獲取指定PPT檔案的資訊。",
+          "error": null
+        },
+        {
+          "function": "ppt_slides",
+          "name": "ppt_slides",
+          "signature": "ppt_slides(file_path)",
+          "methods": [
+            "GET"
+          ],
+          "path": "/ppt/slides",
+          "full_path": "/ppt/slides",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此API端點用於獲取指定PPT文件的幻燈片資訊。",
+          "error": null
+        },
+        {
+          "function": "ppt_save_as",
+          "name": "ppt_save_as",
+          "signature": "ppt_save_as(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/save_as",
+          "full_path": "/ppt/save_as",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點的功能是將 PowerPoint 檔案另存為指定格式，並返回另存後的檔案路徑和相關資訊。",
+          "error": null
+        },
+        {
+          "function": "ppt_add_blank_slide",
+          "name": "ppt_add_blank_slide",
+          "signature": "ppt_add_blank_slide(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/add_blank_slide",
+          "full_path": "/ppt/add_blank_slide",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點的功能是在 PPT 中新增一頁空白幻燈片。接受 POST 請求，並返回新增幻燈片後的 PPT 路徑、新增的幻燈片索引以及相關資訊。",
+          "error": null
+        },
+        {
+          "function": "ppt_add_blank_slides",
+          "name": "ppt_add_blank_slides",
+          "signature": "ppt_add_blank_slides(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/add_blank_slides",
+          "full_path": "/ppt/add_blank_slides",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此API端點用於在PPT中新增多頁空白頁。",
+          "error": null
+        },
+        {
+          "function": "ppt_add_text",
+          "name": "ppt_add_text",
+          "signature": "ppt_add_text(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/add_text",
+          "full_path": "/ppt/add_text",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於在 PPT 中新增文字，接收 POST 請求，並將新增文字後的 PPT 檔案路徑及相關資訊回傳。",
+          "error": null
+        },
+        {
+          "function": "ppt_add_image",
+          "name": "ppt_add_image",
+          "signature": "ppt_add_image(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/add_image",
+          "full_path": "/ppt/add_image",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此API端點用於在PPT中新增圖片，接收POST請求，並將新增的圖片資訊返回。",
+          "error": null
+        },
+        {
+          "function": "ppt_add_table",
+          "name": "ppt_add_table",
+          "signature": "ppt_add_table(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/add_table",
+          "full_path": "/ppt/add_table",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點用於在 PPT 中新增表格，接收 POST 請求，並將新增的表格資訊返回。",
+          "error": null
+        },
+        {
+          "function": "ppt_add_shape",
+          "name": "ppt_add_shape",
+          "signature": "ppt_add_shape(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/add_shape",
+          "full_path": "/ppt/add_shape",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點用於新增簡報中的圖形，接收 POST 請求，並根據請求中的參數在指定幻燈片上新增圖形。",
+          "error": null
+        },
+        {
+          "function": "ppt_add_line",
+          "name": "ppt_add_line",
+          "signature": "ppt_add_line(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/add_line",
+          "full_path": "/ppt/add_line",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於在 PPT 中新增線段，接收 POST 請求，並將新增的線段資訊回傳。",
+          "error": null
+        },
+        {
+          "function": "ppt_add_arrow",
+          "name": "ppt_add_arrow",
+          "signature": "ppt_add_arrow(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/add_arrow",
+          "full_path": "/ppt/add_arrow",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於在 PPT 中新增箭頭，接收 POST 請求，並將箭頭添加至指定投影片中。",
+          "error": null
+        },
+        {
+          "function": "ppt_delete_slide",
+          "name": "ppt_delete_slide",
+          "signature": "ppt_delete_slide(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/delete_slide",
+          "full_path": "/ppt/delete_slide",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點用於刪除演示文稿中的特定投影片。",
+          "error": null
+        },
+        {
+          "function": "ppt_duplicate_slide",
+          "name": "ppt_duplicate_slide",
+          "signature": "ppt_duplicate_slide(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/duplicate_slide",
+          "full_path": "/ppt/duplicate_slide",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點的功能是複製 PowerPoint 中的特定投影片，並返回複製後的投影片資訊。",
+          "error": null
+        },
+        {
+          "function": "ppt_replace_text",
+          "name": "ppt_replace_text",
+          "signature": "ppt_replace_text(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/replace_text",
+          "full_path": "/ppt/replace_text",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點用於替換 PowerPoint 文件中的文字內容。",
+          "error": null
+        },
+        {
+          "function": "ppt_add_bullets",
+          "name": "ppt_add_bullets",
+          "signature": "ppt_add_bullets(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/add_bullets",
+          "full_path": "/ppt/add_bullets",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此API端點用於新增幻燈片中的項目符號，接收POST請求，並指定要新增的項目內容及相關設定。",
+          "error": null
+        },
+        {
+          "function": "ppt_add_title_slide",
+          "name": "ppt_add_title_slide",
+          "signature": "ppt_add_title_slide(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/add_title_slide",
+          "full_path": "/ppt/add_title_slide",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此API端點用於新增PowerPoint檔案的標題頁。",
+          "error": null
+        },
+        {
+          "function": "ppt_reorder_slides",
+          "name": "ppt_reorder_slides",
+          "signature": "ppt_reorder_slides(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/reorder_slides",
+          "full_path": "/ppt/reorder_slides",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點用於重新排序幻燈片，接收 POST 請求，並根據請求中提供的新順序重新排列幻燈片。",
+          "error": null
+        },
+        {
+          "function": "ppt_set_slides_background_color",
+          "name": "ppt_set_slides_background_color",
+          "signature": "ppt_set_slides_background_color(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/set_slides_background_color",
+          "full_path": "/ppt/set_slides_background_color",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於設定幻燈片的背景顏色，接受 POST 請求，並可設定多頁幻燈片的背景顏色。",
+          "error": null
+        },
+        {
+          "function": "ppt_set_slides_background_image",
+          "name": "ppt_set_slides_background_image",
+          "signature": "ppt_set_slides_background_image(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/set_slides_background_image",
+          "full_path": "/ppt/set_slides_background_image",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於設定幻燈片的背景圖片，接受 POST 請求，並可設定多頁幻燈片的背景圖片。",
+          "error": null
+        },
+        {
+          "function": "ppt_set_slide_background_color",
+          "name": "ppt_set_slide_background_color",
+          "signature": "ppt_set_slide_background_color(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/set_slide_background_color",
+          "full_path": "/ppt/set_slide_background_color",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點用於設定幻燈片的背景顏色。",
+          "error": null
+        },
+        {
+          "function": "ppt_set_slide_background_image",
+          "name": "ppt_set_slide_background_image",
+          "signature": "ppt_set_slide_background_image(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/set_slide_background_image",
+          "full_path": "/ppt/set_slide_background_image",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此API端點用於設定幻燈片的背景圖片。",
+          "error": null
+        },
+        {
+          "function": "ppt_render_slide_to_image",
+          "name": "ppt_render_slide_to_image",
+          "signature": "ppt_render_slide_to_image(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/render_slide_to_image",
+          "full_path": "/ppt/render_slide_to_image",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點用於將投影片轉換成圖片。",
+          "error": null
+        },
+        {
+          "function": "ppt_render_slides_to_grid_image",
+          "name": "ppt_render_slides_to_grid_image",
+          "signature": "ppt_render_slides_to_grid_image(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/render_slides_to_grid_image",
+          "full_path": "/ppt/render_slides_to_grid_image",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點用於將 PPT 幻燈片渲染成網格圖像，接受 POST 請求。",
+          "error": null
+        }
+      ]
+    }
+  }
+}
