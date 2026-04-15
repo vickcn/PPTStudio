@@ -30,6 +30,8 @@ try:
     from pptx.dml.color import RGBColor
     from pptx.enum.dml import MSO_LINE_DASH_STYLE
     from pptx.enum.shapes import MSO_AUTO_SHAPE_TYPE
+    from pptx.oxml.ns import qn
+    from pptx.oxml.xmlchemy import OxmlElement
     from copy import deepcopy
     from pptx.enum.shapes import PP_PLACEHOLDER
     from pptx.enum.shapes import MSO_SHAPE, MSO_CONNECTOR
@@ -257,6 +259,80 @@ def _rgb_from_color(color_obj: Any) -> Optional[List[int]]:
         return [int(hex_value[0:2], 16), int(hex_value[2:4], 16), int(hex_value[4:6], 16)]
     except Exception:
         return None
+
+
+def _clamp_transparency(value: float) -> float:
+    if value < 0.0:
+        return 0.0
+    if value > 1.0:
+        return 1.0
+    return value
+
+
+def _find_fill_color_node(shape: Any) -> Optional[Any]:
+    try:
+        sp_pr = shape._element.spPr
+        if sp_pr is None:
+            return None
+        solid_fill = sp_pr.find(qn("a:solidFill"))
+        if solid_fill is None:
+            return None
+        for tag in ("a:srgbClr", "a:schemeClr", "a:sysClr", "a:prstClr"):
+            color_node = solid_fill.find(qn(tag))
+            if color_node is not None:
+                return color_node
+        return None
+    except Exception:
+        return None
+
+
+def _read_fill_transparency_from_xml(shape: Any) -> Optional[float]:
+    color_node = _find_fill_color_node(shape)
+    if color_node is None:
+        return None
+    alpha = color_node.find(qn("a:alpha"))
+    if alpha is None:
+        return None
+    alpha_val = alpha.get("val")
+    if alpha_val is None:
+        return None
+    try:
+        alpha_100000 = float(alpha_val)
+    except Exception:
+        return None
+    opacity = max(0.0, min(100000.0, alpha_100000)) / 100000.0
+    return round(1.0 - opacity, 6)
+
+
+def _write_fill_transparency_to_xml(shape: Any, fill_transparency: float) -> None:
+    transparency = _clamp_transparency(float(fill_transparency))
+    alpha_100000 = int(round((1.0 - transparency) * 100000.0))
+
+    sp_pr = shape._element.spPr
+    if sp_pr is None:
+        raise RuntimeError("shape 缺少 spPr，無法設定 fill 透明度")
+
+    solid_fill = sp_pr.find(qn("a:solidFill"))
+    if solid_fill is None:
+        solid_fill = OxmlElement("a:solidFill")
+        sp_pr.append(solid_fill)
+
+    color_node = None
+    for tag in ("a:srgbClr", "a:schemeClr", "a:sysClr", "a:prstClr"):
+        color_node = solid_fill.find(qn(tag))
+        if color_node is not None:
+            break
+    if color_node is None:
+        color_node = OxmlElement("a:srgbClr")
+        color_node.set("val", "FFFFFF")
+        solid_fill.append(color_node)
+
+    for child in list(color_node):
+        if child.tag == qn("a:alpha"):
+            color_node.remove(child)
+    alpha = OxmlElement("a:alpha")
+    alpha.set("val", str(alpha_100000))
+    color_node.append(alpha)
 
 
 def _dash_style_to_name(dash_style: Any) -> Optional[str]:
@@ -853,10 +929,14 @@ class PPTDocument:
                     fill_info["fill_type"] = fill_type_name
 
             fill_info["fill_color"] = _rgb_from_color(getattr(fill, "fore_color", None))
-            try:
-                fill_info["fill_transparency"] = float(fill.transparency) if fill.transparency is not None else None
-            except Exception:
-                fill_info["fill_transparency"] = None
+            xml_transparency = _read_fill_transparency_from_xml(shape)
+            if xml_transparency is not None:
+                fill_info["fill_transparency"] = xml_transparency
+            else:
+                try:
+                    fill_info["fill_transparency"] = float(fill.transparency) if fill.transparency is not None else None
+                except Exception:
+                    fill_info["fill_transparency"] = None
         except Exception as exc:
             notes.append(f"讀取 fill 資訊失敗: {exc}")
 
@@ -930,9 +1010,14 @@ class PPTDocument:
                 shape.fill.fore_color.rgb = _rgb_tuple_to_color(fill_color)
             if fill_transparency is not None:
                 try:
-                    shape.fill.transparency = float(fill_transparency)
+                    # 優先走 OOXML a:alpha，跨渲染器行為較穩定
+                    _write_fill_transparency_to_xml(shape, float(fill_transparency))
                 except Exception as exc:
-                    notes.append(f"設定 fill_transparency 失敗: {exc}")
+                    notes.append(f"設定 XML fill_transparency 失敗，改用 fallback: {exc}")
+                    try:
+                        shape.fill.transparency = float(fill_transparency)
+                    except Exception as sub_exc:
+                        notes.append(f"設定 fallback fill_transparency 失敗: {sub_exc}")
 
         if line_color is not None:
             shape.line.color.rgb = _rgb_tuple_to_color(line_color)
@@ -944,6 +1029,37 @@ class PPTDocument:
         result = self.get_textbox_style(slide_index=slide_index, shape_index=resolved_shape_index)
         result["notes"].extend(notes)
         return result
+
+    def delete_textbox(
+            self,
+            slide_index: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+        ) -> Dict[str, Any]:
+        shape, resolved_shape_index = self._get_textbox_shape(
+            slide_index=slide_index,
+            shape_id=shape_id,
+            shape_index=shape_index,
+        )
+
+        deleted_shape_id = getattr(shape, "shape_id", None)
+        deleted_name = getattr(shape, "name", None)
+        deleted_text_preview = (shape.text_frame.text or "").strip()[:120]
+
+        element = shape._element
+        parent = element.getparent()
+        if parent is None:
+            raise RuntimeError("找不到 shape parent，無法刪除文字框")
+        parent.remove(element)
+
+        return {
+            "slide_index": slide_index,
+            "deleted_shape_index": resolved_shape_index,
+            "deleted_shape_id": deleted_shape_id,
+            "deleted_name": deleted_name,
+            "deleted_text_preview": deleted_text_preview,
+            "remaining_shape_count": len(self.prs.slides[slide_index].shapes),
+        }
 
     def get_slide_text_fonts(self, slide_index: int) -> Dict[str, Any]:
         """
@@ -1113,6 +1229,173 @@ class PPTDocument:
             "font_summary": font_summary,
             "slides": slides,
         }
+
+    def _get_shape(self, slide_index: int, shape_id: Optional[int] = None, shape_index: Optional[int] = None):
+        _validate_slide_index(self.prs, slide_index)
+        slide = self.prs.slides[slide_index]
+
+        if shape_id is None and shape_index is None:
+            raise ValueError("shape_id 與 shape_index 至少需提供一個")
+
+        if shape_id is not None:
+            for idx, shape in enumerate(slide.shapes):
+                if getattr(shape, "shape_id", None) == shape_id:
+                    return shape, idx
+            raise ValueError(f"找不到 shape_id={shape_id}")
+
+        assert shape_index is not None
+        if shape_index < 0 or shape_index >= len(slide.shapes):
+            raise IndexError(f"shape_index 超出範圍: {shape_index}, shape_count={len(slide.shapes)}")
+
+        return slide.shapes[shape_index], shape_index
+
+    def get_shape_style(self, slide_index: int, shape_id: Optional[int] = None, shape_index: Optional[int] = None) -> Dict[str, Any]:
+        shape, resolved_shape_index = self._get_shape(
+            slide_index=slide_index,
+            shape_id=shape_id,
+            shape_index=shape_index,
+        )
+
+        fill_info = {
+            "fill_type": "unknown",
+            "fill_color": None,
+            "fill_transparency": None,
+        }
+        line_info = {
+            "line_style": None,
+            "line_color": None,
+            "line_width_emu": None,
+        }
+        notes: List[str] = []
+
+        try:
+            fill = shape.fill
+            fill_type_raw = getattr(fill, "type", None)
+            if fill_type_raw is None:
+                fill_info["fill_type"] = "inherit"
+            else:
+                fill_type_name = str(fill_type_raw).lower()
+                if "solid" in fill_type_name:
+                    fill_info["fill_type"] = "solid"
+                elif "pattern" in fill_type_name:
+                    fill_info["fill_type"] = "pattern"
+                elif "gradient" in fill_type_name:
+                    fill_info["fill_type"] = "gradient"
+                elif "picture" in fill_type_name:
+                    fill_info["fill_type"] = "picture"
+                elif "background" in fill_type_name:
+                    fill_info["fill_type"] = "background"
+                else:
+                    fill_info["fill_type"] = fill_type_name
+
+            fill_info["fill_color"] = _rgb_from_color(getattr(fill, "fore_color", None))
+            xml_transparency = _read_fill_transparency_from_xml(shape)
+            if xml_transparency is not None:
+                fill_info["fill_transparency"] = xml_transparency
+            else:
+                try:
+                    fill_info["fill_transparency"] = float(fill.transparency) if fill.transparency is not None else None
+                except Exception:
+                    fill_info["fill_transparency"] = None
+        except Exception as exc:
+            notes.append(f"讀取 fill 資訊失敗: {exc}")
+
+        try:
+            line = shape.line
+            line_info["line_style"] = _dash_style_to_name(getattr(line, "dash_style", None))
+            line_info["line_color"] = _rgb_from_color(getattr(line, "color", None))
+            line_info["line_width_emu"] = int(line.width) if line.width is not None else None
+        except Exception as exc:
+            notes.append(f"讀取 line 資訊失敗: {exc}")
+
+        text_preview = None
+        try:
+            if getattr(shape, "has_text_frame", False):
+                text_preview = (shape.text_frame.text or "").strip()[:120]
+        except Exception:
+            text_preview = None
+
+        return {
+            "slide_index": slide_index,
+            "shape_index": resolved_shape_index,
+            "shape_id": getattr(shape, "shape_id", None),
+            "name": getattr(shape, "name", None),
+            "shape_type": str(getattr(shape, "shape_type", "")),
+            "has_text_frame": bool(getattr(shape, "has_text_frame", False)),
+            "text_preview": text_preview,
+            "fill_type": fill_info["fill_type"],
+            "fill_color": fill_info["fill_color"],
+            "fill_transparency": fill_info["fill_transparency"],
+            "line_style": line_info["line_style"],
+            "line_color": line_info["line_color"],
+            "line_width_emu": line_info["line_width_emu"],
+            "notes": notes,
+        }
+
+    def set_shape_style(
+            self,
+            slide_index: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+            fill_color: Optional[Tuple[int, int, int]] = None,
+            fill_transparency: Optional[float] = None,
+            line_style: Optional[str] = None,
+            line_color: Optional[Tuple[int, int, int]] = None,
+            line_width: Optional[int] = None,
+        ) -> Dict[str, Any]:
+        shape, resolved_shape_index = self._get_shape(
+            slide_index=slide_index,
+            shape_id=shape_id,
+            shape_index=shape_index,
+        )
+
+        if fill_transparency is not None and not (0.0 <= float(fill_transparency) <= 1.0):
+            raise ValueError("fill_transparency 必須介於 0.0 ~ 1.0")
+        if line_width is not None and line_width < 0:
+            raise ValueError("line_width 不可小於 0")
+
+        notes: List[str] = []
+
+        if fill_color is not None or fill_transparency is not None:
+            shape.fill.solid()
+            if fill_color is not None:
+                shape.fill.fore_color.rgb = _rgb_tuple_to_color(fill_color)
+            if fill_transparency is not None:
+                try:
+                    _write_fill_transparency_to_xml(shape, float(fill_transparency))
+                except Exception as exc:
+                    notes.append(f"設定 XML fill_transparency 失敗，改用 fallback: {exc}")
+                    try:
+                        shape.fill.transparency = float(fill_transparency)
+                    except Exception as sub_exc:
+                        notes.append(f"設定 fallback fill_transparency 失敗: {sub_exc}")
+
+        if line_color is not None:
+            shape.line.color.rgb = _rgb_tuple_to_color(line_color)
+        if line_width is not None:
+            shape.line.width = Emu(line_width)
+        if line_style is not None:
+            shape.line.dash_style = _name_to_dash_style(line_style)
+
+        result = self.get_shape_style(slide_index=slide_index, shape_index=resolved_shape_index)
+        result["notes"].extend(notes)
+        return result
+
+    def set_shape_fill_transparency(
+            self,
+            slide_index: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+            fill_transparency: float = 0.4,
+            fill_color: Optional[Tuple[int, int, int]] = None,
+        ) -> Dict[str, Any]:
+        return self.set_shape_style(
+            slide_index=slide_index,
+            shape_id=shape_id,
+            shape_index=shape_index,
+            fill_color=fill_color,
+            fill_transparency=fill_transparency,
+        )
 
     def delete_slide(self, slide_index: int) -> Dict[str, Any]:
         _validate_slide_index(self.prs, slide_index)
@@ -1490,6 +1773,305 @@ def add_text(
     )
 
 
+# ---------------------------------------------------------------------------
+# 文字藝術師 / WordArt 類需求（骨架）：規格見 issues/文字藝術師.iss 第一層 API
+# 實作「範本複製」或 OOXML 直改時，可斟酌啟用（模組前段 try 區可能已匯入部分）：
+# from copy import deepcopy
+# from pptx.oxml.ns import qn
+# from pptx.oxml import parse_xml
+# ---------------------------------------------------------------------------
+
+
+def add_wordart_like_textbox(
+        document: PPTDocument,
+        slide_index: int,
+        text: str,
+        left: int,
+        top: int,
+        width: int,
+        height: int,
+        font_size: int = 28,
+        bold: bool = True,
+        font_name: Optional[str] = None,
+        font_color: Optional[Tuple[int, int, int]] = None,
+        align: str = "center",
+    ) -> Dict[str, Any]:
+    """
+    以一般文字框模擬 WordArt 風格（大字、描邊／底色等由後續參數擴充）。
+
+    實作提示：
+    - 底層可呼叫既有 add_text / add_textbox 邏輯並加強字型與外框
+    - 非 PowerPoint 原生 WordArt 物件；複雜特效需改 OOXML 或改走 clone_named_shape_from_template
+    """
+    _ensure_pptx_available()
+    _validate_slide_index(document.prs, slide_index)
+    result = document.add_textbox(
+        slide_index=slide_index,
+        text=text,
+        left=left,
+        top=top,
+        width=width,
+        height=height,
+        font_size=font_size,
+        bold=bold,
+        italic=False,
+        font_name=font_name,
+        font_color=font_color,
+        align=align,
+    )
+    result["notes"] = ["以 TextBox 模擬 WordArt；複雜特效請改用範本複製或 OOXML。"]
+    return result
+
+
+def update_wordart_text(
+        document: PPTDocument,
+        slide_index: int,
+        new_text: str,
+        shape_name: Optional[str] = None,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    """
+    更新現有「類 WordArt」或範本複製 shape 的文字；優先只改 run.text 以保留特效。
+
+    實作提示：
+    - 依 shape_name 或 shape_id / shape_index 解析目標 shape（與 delete_textbox 解析策略對齊）
+    - 僅在 has_text_frame 時更新；否則 notes 說明並不中斷其他欄位處理（若有多段）
+    """
+    _ensure_pptx_available()
+    _validate_slide_index(document.prs, slide_index)
+    slide = document.prs.slides[slide_index]
+
+    resolved_shape_index: Optional[int] = None
+    shape = None
+
+    if shape_name is not None:
+        target_name = str(shape_name)
+        for idx, candidate in enumerate(slide.shapes):
+            if getattr(candidate, "name", None) == target_name:
+                shape = candidate
+                resolved_shape_index = idx
+                break
+        if shape is None:
+            raise ValueError(f"找不到 shape_name={target_name}")
+    else:
+        shape, resolved_shape_index = document._get_shape(
+            slide_index=slide_index,
+            shape_id=shape_id,
+            shape_index=shape_index,
+        )
+
+    notes: List[str] = []
+    # 保留原始邊框 XML，避免改字時意外改動 outline。
+    original_line_xml = None
+    had_explicit_line = False
+    try:
+        sp_pr = shape._element.spPr
+        if sp_pr is not None:
+            line_node = sp_pr.find(qn("a:ln"))
+            if line_node is not None:
+                had_explicit_line = True
+                original_line_xml = deepcopy(line_node)
+    except Exception as exc:
+        notes.append(f"讀取原始邊框設定失敗，將略過邊框保留: {exc}")
+
+    before_text_preview = None
+    if getattr(shape, "has_text_frame", False):
+        try:
+            before_text_preview = (shape.text_frame.text or "").strip()[:120]
+        except Exception:
+            before_text_preview = None
+
+    if not getattr(shape, "has_text_frame", False):
+        notes.append("目標 shape 無 text_frame，未更新文字。")
+        return {
+            "slide_index": slide_index,
+            "shape_index": resolved_shape_index,
+            "shape_id": getattr(shape, "shape_id", None),
+            "shape_name": getattr(shape, "name", None),
+            "updated": False,
+            "before_text_preview": before_text_preview,
+            "after_text_preview": before_text_preview,
+            "notes": notes,
+        }
+
+    text_frame = shape.text_frame
+    paragraphs = list(text_frame.paragraphs)
+    if len(paragraphs) == 0:
+        text_frame.text = "" if new_text is None else str(new_text)
+        notes.append("原文字框沒有 paragraph，改以 text_frame.text fallback 寫入。")
+    else:
+        target_text = "" if new_text is None else str(new_text)
+        first_paragraph = paragraphs[0]
+        first_runs = list(first_paragraph.runs)
+        if len(first_runs) > 0:
+            first_runs[0].text = target_text
+            for run in first_runs[1:]:
+                run.text = ""
+        else:
+            first_paragraph.text = target_text
+            notes.append("原第一段沒有 runs，改以 paragraph.text fallback 寫入。")
+
+        for paragraph in paragraphs[1:]:
+            for run in paragraph.runs:
+                run.text = ""
+            if len(paragraph.runs) == 0:
+                paragraph.text = ""
+
+    try:
+        sp_pr = shape._element.spPr
+        if sp_pr is not None:
+            current_line_node = sp_pr.find(qn("a:ln"))
+            if had_explicit_line:
+                if current_line_node is not None:
+                    sp_pr.remove(current_line_node)
+                if original_line_xml is not None:
+                    sp_pr.append(deepcopy(original_line_xml))
+            else:
+                if current_line_node is not None:
+                    sp_pr.remove(current_line_node)
+    except Exception as exc:
+        notes.append(f"還原原始邊框設定失敗: {exc}")
+
+    after_text_preview = None
+    try:
+        after_text_preview = (shape.text_frame.text or "").strip()[:120]
+    except Exception:
+        after_text_preview = None
+
+    return {
+        "slide_index": slide_index,
+        "shape_index": resolved_shape_index,
+        "shape_id": getattr(shape, "shape_id", None),
+        "shape_name": getattr(shape, "name", None),
+        "updated": True,
+        "before_text_preview": before_text_preview,
+        "after_text_preview": after_text_preview,
+        "notes": notes,
+    }
+
+
+def delete_shape(
+        document: PPTDocument,
+        slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    """
+    刪除投影片上任意一個 shape（含以圖片／群組偽裝者）；本質為從 XML parent 移除元素。
+
+    實作提示：
+    - 可參考 issues：`el = shape._element; parent.remove(el)`
+    - 與 delete_textbox 差異：不限定文字方塊；需處理找不到 shape 的錯誤訊息
+    """
+    _ensure_pptx_available()
+    shape, resolved_shape_index = document._get_shape(
+        slide_index=slide_index,
+        shape_id=shape_id,
+        shape_index=shape_index,
+    )
+
+    deleted_shape_id = getattr(shape, "shape_id", None)
+    deleted_name = getattr(shape, "name", None)
+    deleted_shape_type = str(getattr(shape, "shape_type", ""))
+    deleted_text_preview = None
+    if getattr(shape, "has_text_frame", False):
+        try:
+            deleted_text_preview = (shape.text_frame.text or "").strip()[:120]
+        except Exception:
+            deleted_text_preview = None
+
+    element = shape._element
+    parent = element.getparent()
+    if parent is None:
+        raise RuntimeError("找不到 shape parent，無法刪除")
+    parent.remove(element)
+
+    return {
+        "slide_index": slide_index,
+        "deleted_shape_index": resolved_shape_index,
+        "deleted_shape_id": deleted_shape_id,
+        "deleted_name": deleted_name,
+        "deleted_shape_type": deleted_shape_type,
+        "deleted_text_preview": deleted_text_preview,
+        "remaining_shape_count": len(document.prs.slides[slide_index].shapes),
+    }
+
+
+def clone_named_shape_from_template(
+        document: PPTDocument,
+        slide_index: int,
+        shape_name: str,
+        new_text: str = "",
+        left: Optional[int] = None,
+        top: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    """
+    從指定頁依 shape.name 找到範本 shape，複製到同頁（或指定位置），並可選填新文字。
+
+    issues 原簽名以 slide 為單位；此處改為 document + slide_index 以符合 ppt_stdio 慣例。
+
+    實作提示：
+    - 複製可 deepcopy(shape._element) 後插入 spTree，並處理 rId / 媒體關聯
+    - 若範本在「另一份簡報」，可另增參數 template_path（此處先以註解預留擴充點）
+    """
+    _ensure_pptx_available()
+    _validate_slide_index(document.prs, slide_index)
+    if not shape_name:
+        raise ValueError("shape_name 不可為空")
+
+    slide = document.prs.slides[slide_index]
+    source_shape = None
+    source_shape_index = None
+    for idx, candidate in enumerate(slide.shapes):
+        if getattr(candidate, "name", None) == shape_name:
+            source_shape = candidate
+            source_shape_index = idx
+            break
+    if source_shape is None:
+        raise ValueError(f"找不到 shape_name={shape_name}")
+
+    before_count = len(slide.shapes)
+    new_el = deepcopy(source_shape._element)
+    slide.shapes._spTree.insert_element_before(new_el, "p:extLst")
+
+    if len(slide.shapes) <= before_count:
+        raise RuntimeError("shape 複製失敗：新增後 shape 數量未增加")
+
+    cloned_shape = slide.shapes[before_count]
+    cloned_shape_index = before_count
+    notes: List[str] = []
+
+    if left is not None:
+        cloned_shape.left = Emu(left)
+    if top is not None:
+        cloned_shape.top = Emu(top)
+
+    if new_text:
+        update_res = update_wordart_text(
+            document=document,
+            slide_index=slide_index,
+            new_text=new_text,
+            shape_id=getattr(cloned_shape, "shape_id", None),
+        )
+        notes.extend(update_res.get("notes", []))
+
+    # TODO: 若要支援「跨簡報範本複製」，可新增 template_path 並補 rels 搬移流程。
+    return {
+        "slide_index": slide_index,
+        "source_shape_index": source_shape_index,
+        "source_shape_id": getattr(source_shape, "shape_id", None),
+        "source_shape_name": getattr(source_shape, "name", None),
+        "cloned_shape_index": cloned_shape_index,
+        "cloned_shape_id": getattr(cloned_shape, "shape_id", None),
+        "cloned_shape_name": getattr(cloned_shape, "name", None),
+        "left": int(cloned_shape.left),
+        "top": int(cloned_shape.top),
+        "new_text": new_text,
+        "notes": notes,
+    }
+
+
 def add_image(
         document: PPTDocument,
         slide_index: int,
@@ -1674,6 +2256,19 @@ def set_textbox_style(
         line_style=line_style,
         line_color=line_color,
         line_width=line_width,
+    )
+
+
+def delete_textbox(
+        document: PPTDocument,
+        slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    return document.delete_textbox(
+        slide_index=slide_index,
+        shape_id=shape_id,
+        shape_index=shape_index,
     )
 
 
@@ -2295,6 +2890,59 @@ def scan_presentation_backgrounds(document: PPTDocument) -> Dict[str, Any]:
     }
 
 
+def get_shape_style(
+        document: PPTDocument,
+        slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    return document.get_shape_style(
+        slide_index=slide_index,
+        shape_id=shape_id,
+        shape_index=shape_index,
+    )
+
+
+def set_shape_style(
+        document: PPTDocument,
+        slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        fill_color: Optional[Tuple[int, int, int]] = None,
+        fill_transparency: Optional[float] = None,
+        line_style: Optional[str] = None,
+        line_color: Optional[Tuple[int, int, int]] = None,
+        line_width: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    return document.set_shape_style(
+        slide_index=slide_index,
+        shape_id=shape_id,
+        shape_index=shape_index,
+        fill_color=fill_color,
+        fill_transparency=fill_transparency,
+        line_style=line_style,
+        line_color=line_color,
+        line_width=line_width,
+    )
+
+
+def set_shape_fill_transparency(
+        document: PPTDocument,
+        slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        fill_transparency: float = 0.4,
+        fill_color: Optional[Tuple[int, int, int]] = None,
+    ) -> Dict[str, Any]:
+    return document.set_shape_fill_transparency(
+        slide_index=slide_index,
+        shape_id=shape_id,
+        shape_index=shape_index,
+        fill_transparency=fill_transparency,
+        fill_color=fill_color,
+    )
+
+
 def delete_slide(document: PPTDocument, slide_index: int) -> Dict[str, Any]:
     return document.delete_slide(slide_index)
 
@@ -2658,4 +3306,3 @@ if __name__ == "__main__":
 
     save(doc)
     print(get_info(doc))
-

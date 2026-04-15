@@ -25,6 +25,8 @@ from dataProcess.ppt_stdio import (
     add_blank_slide,
     add_blank_slides,
     add_text,
+    add_wordart_like_textbox,
+    update_wordart_text,
     add_image,
     add_table,
     add_line,
@@ -35,6 +37,9 @@ from dataProcess.ppt_stdio import (
     get_textbox_style,
     get_slide_textbox_styles,
     set_textbox_style,
+    delete_textbox,
+    delete_shape,
+    clone_named_shape_from_template,
     get_slide_text_fonts,
     scan_presentation_text_fonts,
     get_presentation_theme_info,
@@ -109,6 +114,32 @@ class AddTextRequest(BaseModel):
     save_as: Optional[str] = None
 
 
+class AddWordartLikeTextboxRequest(BaseModel):
+    file_path: str
+    slide_index: int = Field(..., ge=0)
+    text: str = ""
+    left: int = Field(..., ge=0)
+    top: int = Field(..., ge=0)
+    width: int = Field(..., gt=0)
+    height: int = Field(..., gt=0)
+    font_size: int = Field(28, gt=0)
+    bold: bool = True
+    font_name: Optional[str] = None
+    font_color: Optional[List[int]] = None
+    align: str = "center"
+    save_as: Optional[str] = None
+
+
+class UpdateWordartTextRequest(BaseModel):
+    file_path: str
+    slide_index: int = Field(..., ge=0)
+    new_text: str = ""
+    shape_name: Optional[str] = None
+    shape_id: Optional[int] = None
+    shape_index: Optional[int] = Field(None, ge=0)
+    save_as: Optional[str] = None
+
+
 class AddImageRequest(BaseModel):
     file_path: str
     slide_index: int = Field(..., ge=0)
@@ -139,6 +170,32 @@ class AddTableRequest(BaseModel):
 class DeleteSlideRequest(BaseModel):
     file_path: str
     slide_index: int = Field(..., ge=0)
+    save_as: Optional[str] = None
+
+
+class DeleteTextboxRequest(BaseModel):
+    file_path: str
+    slide_index: int = Field(..., ge=0)
+    shape_id: Optional[int] = None
+    shape_index: Optional[int] = Field(None, ge=0)
+    save_as: Optional[str] = None
+
+
+class DeleteShapeRequest(BaseModel):
+    file_path: str
+    slide_index: int = Field(..., ge=0)
+    shape_id: Optional[int] = None
+    shape_index: Optional[int] = Field(None, ge=0)
+    save_as: Optional[str] = None
+
+
+class CloneNamedShapeFromTemplateRequest(BaseModel):
+    file_path: str
+    slide_index: int = Field(..., ge=0)
+    shape_name: str
+    new_text: str = ""
+    left: Optional[int] = Field(None, ge=0)
+    top: Optional[int] = Field(None, ge=0)
     save_as: Optional[str] = None
 
 
@@ -422,6 +479,68 @@ def ppt_set_textbox_style(req: SetTextboxStyleRequest):
         _err_to_http(e)
 
 
+@app.post("/ppt/delete_textbox")
+def ppt_delete_textbox(req: DeleteTextboxRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = delete_textbox(
+            document=doc,
+            slide_index=req.slide_index,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="刪除文字框成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/delete_shape")
+def ppt_delete_shape(req: DeleteShapeRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = delete_shape(
+            document=doc,
+            slide_index=req.slide_index,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="刪除 shape 成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/clone_named_shape_from_template")
+def ppt_clone_named_shape_from_template(req: CloneNamedShapeFromTemplateRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = clone_named_shape_from_template(
+            document=doc,
+            slide_index=req.slide_index,
+            shape_name=req.shape_name,
+            new_text=req.new_text,
+            left=req.left,
+            top=req.top,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="複製命名 shape 成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
 @app.get("/ppt/slide_fonts")
 def ppt_slide_fonts(file_path: str, slide_index: int = 0):
     try:
@@ -558,6 +677,65 @@ def ppt_add_text(req: AddTextRequest):
             "result": result,
             "info": get_info(doc),
         }, message="新增文字成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/add_wordart_like_textbox")
+def ppt_add_wordart_like_textbox(req: AddWordartLikeTextboxRequest):
+    try:
+        doc = open_presentation(req.file_path)
+
+        font_color = None
+        if req.font_color is not None:
+            if len(req.font_color) != 3:
+                raise ValueError("font_color 格式必須是 [R, G, B]")
+            font_color = (req.font_color[0], req.font_color[1], req.font_color[2])
+
+        result = add_wordart_like_textbox(
+            document=doc,
+            slide_index=req.slide_index,
+            text=req.text,
+            left=req.left,
+            top=req.top,
+            width=req.width,
+            height=req.height,
+            font_size=req.font_size,
+            bold=req.bold,
+            font_name=req.font_name,
+            font_color=font_color,
+            align=req.align,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="新增 wordart_like_textbox 成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/update_wordart_text")
+def ppt_update_wordart_text(req: UpdateWordartTextRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = update_wordart_text(
+            document=doc,
+            slide_index=req.slide_index,
+            new_text=req.new_text,
+            shape_name=req.shape_name,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="更新 wordart 文字成功")
     except Exception as e:
         _err_to_http(e)
 

@@ -641,6 +641,25 @@ async def set_textbox_style(
 
 
 @mcp.tool()
+async def delete_textbox(
+    file_path: str,
+    slide_index: int,
+    shape_id: Optional[int] = None,
+    shape_index: Optional[int] = None,
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """刪除指定文字框（可用 shape_id 或 shape_index 定位）。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+        "save_as": save_as,
+    }
+    return await _request("POST", "/ppt/delete_textbox", json_body=body)
+
+
+@mcp.tool()
 async def render_slide_to_image(
     file_path: str,
     slide_index: int,
