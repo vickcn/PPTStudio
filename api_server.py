@@ -1,23 +1,26 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 api_server.py
 
-FastAPI 包裝 PPT 核心功能
-啟動:
+FastAPI PPT
+
+Usage:
     uvicorn api_server:app --host 0.0.0.0 --port 8010
 
-依賴:
+Dependencies:
     pip install fastapi uvicorn python-pptx pillow
 """
 
 import os
 import json
+import logging
 import traceback
 from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+import dataProcess.ppt_stdio as ppt_stdio_mod
 from dataProcess.ppt_stdio import (
     new,
     open_presentation,
@@ -37,6 +40,8 @@ from dataProcess.ppt_stdio import (
     get_textbox_style,
     get_slide_textbox_styles,
     set_textbox_style,
+    drag_shape,
+    drag_textbox,
     delete_textbox,
     delete_shape,
     clone_named_shape_from_template,
@@ -57,6 +62,13 @@ from dataProcess.ppt_stdio import (
     reorder_slides,
     render_slide_to_image,
     render_slides_to_grid_image,
+    parse_math_expression,
+    add_equation,
+    add_equation_omml,
+    update_equation,
+    update_equation_omml,
+    delete_equation,
+    delete_equation_omml,
 )
 
 
@@ -65,6 +77,14 @@ app = FastAPI(
     version="0.1.0",
     description="提供 PPTX 建立與編輯的 API，之後可再包成 MCP tools",
 )
+
+logger = logging.getLogger("ppt_api")
+_LOG_LEVEL_NAME = os.environ.get("PPT_API_LOG_LEVEL", "WARNING").upper()
+_LOG_LEVEL = getattr(logging, _LOG_LEVEL_NAME, logging.WARNING)
+if not logging.getLogger().handlers:
+    logging.basicConfig(level=_LOG_LEVEL)
+logger.setLevel(_LOG_LEVEL)
+logger.info("Loaded ppt_stdio module: %s", getattr(ppt_stdio_mod, "__file__", "<unknown>"))
 
 
 def _load_server_config() -> Dict[str, Any]:
@@ -196,6 +216,63 @@ class CloneNamedShapeFromTemplateRequest(BaseModel):
     new_text: str = ""
     left: Optional[int] = Field(None, ge=0)
     top: Optional[int] = Field(None, ge=0)
+    save_as: Optional[str] = None
+
+
+class ParseMathExpressionRequest(BaseModel):
+    """Parse spoken math or LaTeX only; does not modify PPTX."""
+    input_text: str = Field(..., description="Raw input text")
+    input_type: str = Field("latex", description="spoken or latex")
+
+
+class EquationTextRun(BaseModel):
+    text: str
+    font_name: Optional[str] = None
+    font_size: Optional[int] = Field(None, gt=0)
+    bold: Optional[bool] = None
+    italic: Optional[bool] = None
+    font_color: Optional[List[int]] = Field(None, min_length=3, max_length=3)
+
+
+class AddEquationRequest(BaseModel):
+    """Add equation; default is OMML, image mode keeps M1 compatibility."""
+    file_path: str
+    slide_index: int = Field(..., ge=0)
+    input_text: str = Field(..., description="Spoken math or LaTeX")
+    input_type: str = Field("latex", description="spoken or latex")
+    left: int = Field(..., ge=0)
+    top: int = Field(..., ge=0)
+    width: Optional[int] = Field(None, gt=0)
+    height: Optional[int] = Field(None, gt=0)
+    font_size: Optional[int] = Field(None, gt=0)
+    color: Optional[List[int]] = Field(None, description="RGB color")
+    prefix_runs: Optional[List[EquationTextRun]] = None
+    suffix_runs: Optional[List[EquationTextRun]] = None
+    render_mode: str = Field("omml", description="omml or image")
+    save_as: Optional[str] = None
+
+
+class UpdateEquationRequest(BaseModel):
+    """Update equation; default is OMML, image mode updates image equations."""
+    file_path: str
+    input_text: str
+    input_type: str = Field("latex", description="spoken or latex")
+    expr_id: Optional[str] = None
+    shape_id: Optional[int] = None
+    slide_index: Optional[int] = Field(None, ge=0, description="Optional hint for locating target")
+    prefix_runs: Optional[List[EquationTextRun]] = None
+    suffix_runs: Optional[List[EquationTextRun]] = None
+    render_mode: str = Field("omml", description="omml or image")
+    save_as: Optional[str] = None
+
+
+class DeleteEquationRequest(BaseModel):
+    """Delete equation; default is OMML, image mode deletes image equations."""
+    file_path: str
+    expr_id: Optional[str] = None
+    shape_id: Optional[int] = None
+    slide_index: Optional[int] = Field(None, ge=0)
+    render_mode: str = Field("omml", description="omml or image")
     save_as: Optional[str] = None
 
 
@@ -340,6 +417,34 @@ class SetTextboxStyleRequest(BaseModel):
     save_as: Optional[str] = None
 
 
+class DragTextboxRequest(BaseModel):
+    file_path: str
+    slide_index: int = Field(..., ge=0)
+    shape_id: Optional[int] = None
+    shape_index: Optional[int] = Field(None, ge=0)
+    left: Optional[int] = Field(None, ge=0, description="Horizontal offset in EMUs")
+    top: Optional[int] = Field(None, ge=0, description="Vertical offset in EMUs")
+    delta_x: Optional[int] = Field(None, description="Horizontal delta in EMUs")
+    delta_y: Optional[int] = Field(None, description="Vertical delta in EMUs")
+    width: Optional[int] = Field(None, gt=0, description="New width in EMUs")
+    height: Optional[int] = Field(None, gt=0, description="New height in EMUs")
+    save_as: Optional[str] = None
+
+
+class DragShapeRequest(BaseModel):
+    file_path: str
+    slide_index: int = Field(..., ge=0)
+    shape_id: Optional[int] = None
+    shape_index: Optional[int] = Field(None, ge=0)
+    left: Optional[int] = Field(None, ge=0)
+    top: Optional[int] = Field(None, ge=0)
+    delta_x: Optional[int] = None
+    delta_y: Optional[int] = None
+    width: Optional[int] = Field(None, gt=0)
+    height: Optional[int] = Field(None, gt=0)
+    save_as: Optional[str] = None
+
+
 class RenderSlideToImageRequest(BaseModel):
     file_path: str
     slide_index: int = Field(..., ge=0)
@@ -375,6 +480,18 @@ def _err_to_http(e: Exception):
             "traceback": traceback.format_exc(),
         }
     )
+
+
+def _serialize_runs(runs: Optional[List[EquationTextRun]]) -> Optional[List[Dict[str, Any]]]:
+    if not runs:
+        return None
+    result: List[Dict[str, Any]] = []
+    for run in runs:
+        if hasattr(run, "dict"):
+            result.append(run.dict(exclude_none=True))
+        else:
+            result.append(dict(run))
+    return result
 
 
 # -------------------------
@@ -475,6 +592,58 @@ def ppt_set_textbox_style(req: SetTextboxStyleRequest):
             "result": result,
             "info": get_info(doc),
         }, message="更新文字框樣式成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/drag_textbox")
+def ppt_drag_textbox(req: DragTextboxRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = drag_textbox(
+            document=doc,
+            slide_index=req.slide_index,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+            left=req.left,
+            top=req.top,
+            delta_x=req.delta_x,
+            delta_y=req.delta_y,
+            width=req.width,
+            height=req.height,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="拖曳文字框成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/drag_shape")
+def ppt_drag_shape(req: DragShapeRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = drag_shape(
+            document=doc,
+            slide_index=req.slide_index,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+            left=req.left,
+            top=req.top,
+            delta_x=req.delta_x,
+            delta_y=req.delta_y,
+            width=req.width,
+            height=req.height,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="shape 已拖拉")
     except Exception as e:
         _err_to_http(e)
 
@@ -1109,6 +1278,163 @@ def ppt_render_slides_to_grid_image(req: RenderSlidesToGridImageRequest):
             figure_title=req.figure_title,
         )
         return _ok(result, message="多頁拼圖成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/parse_math_expression")
+def ppt_parse_math_expression(req: ParseMathExpressionRequest):
+    """解析數學公式：默認使用 OMML 路徑，image 模式保持與 M1 兼容。"""
+    try:
+        data = parse_math_expression(req.input_text, req.input_type)
+        return _ok(data, message="解析數學公式成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/add_equation")
+def ppt_add_equation(req: AddEquationRequest):
+    """Add equation: default OMML path, image mode keeps M1 compatibility."""
+    try:
+        doc = open_presentation(req.file_path)
+        color_rgb = tuple(req.color) if req.color is not None else None
+        mode = (req.render_mode or "omml").strip().lower()
+        logger.info(
+            "add_equation request mode=%s file=%s slide=%s input_type=%s text=%s",
+            mode,
+            req.file_path,
+            req.slide_index,
+            req.input_type,
+            (req.input_text or "")[:120],
+        )
+
+        if mode == "image":
+            result = add_equation(
+                document=doc,
+                slide_index=req.slide_index,
+                input_text=req.input_text,
+                input_type=req.input_type,
+                left=req.left,
+                top=req.top,
+                width=req.width,
+                height=req.height,
+                font_size=req.font_size,
+                color=color_rgb,
+            )
+            msg = "add equation (image) success"
+        else:
+            prefix_runs = _serialize_runs(req.prefix_runs)
+            suffix_runs = _serialize_runs(req.suffix_runs)
+            result = add_equation_omml(
+                document=doc,
+                slide_index=req.slide_index,
+                input_text=req.input_text,
+                input_type=req.input_type,
+                left=req.left,
+                top=req.top,
+                width=req.width,
+                height=req.height,
+                font_size=req.font_size,
+                color=color_rgb,
+                prefix_runs=prefix_runs,
+                suffix_runs=suffix_runs,
+            )
+            msg = "add equation (omml) success"
+
+        if isinstance(result, dict):
+            omml_ref = result.get("omml_fragment_ref")
+            logger.info(
+                "add_equation result mode=%s expr_id=%s shape_id=%s slide=%s render_mode=%s omml_write_mode=%s omml_prefix=%s",
+                mode,
+                result.get("expr_id"),
+                result.get("shape_id"),
+                result.get("slide_index"),
+                result.get("render_mode"),
+                result.get("omml_write_mode"),
+                (omml_ref[:160] if isinstance(omml_ref, str) else None),
+            )
+
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok(
+            {
+                "file_path": out_path,
+                "result": result,
+                "info": get_info(doc),
+            },
+            message=msg,
+        )
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/update_equation")
+def ppt_update_equation(req: UpdateEquationRequest):
+    """更新數學公式：默認使用 OMML 路徑，image 模式更新圖像公式。"""
+    try:
+        doc = open_presentation(req.file_path)
+        mode = (req.render_mode or "omml").strip().lower()
+        if mode == "image":
+            result = update_equation(
+                document=doc,
+                input_text=req.input_text,
+                input_type=req.input_type,
+                expr_id=req.expr_id,
+                shape_id=req.shape_id,
+                slide_index=req.slide_index,
+            )
+            msg = "更新數學公式 (image) 成功"
+        else:
+            prefix_runs = _serialize_runs(req.prefix_runs)
+            suffix_runs = _serialize_runs(req.suffix_runs)
+            result = update_equation_omml(
+                document=doc,
+                input_text=req.input_text,
+                input_type=req.input_type,
+                expr_id=req.expr_id,
+                shape_id=req.shape_id,
+                slide_index=req.slide_index,
+                prefix_runs=prefix_runs,
+                suffix_runs=suffix_runs,
+            )
+            msg = "更新數學公式 (OMML) 成功"
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message=msg)
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/delete_equation")
+def ppt_delete_equation(req: DeleteEquationRequest):
+    """刪除數學公式：默認使用 OMML 路徑，image 模式刪除圖像公式。"""
+    try:
+        doc = open_presentation(req.file_path)
+        mode = (req.render_mode or "omml").strip().lower()
+        if mode == "image":
+            result = delete_equation(
+                document=doc,
+                expr_id=req.expr_id,
+                shape_id=req.shape_id,
+                slide_index=req.slide_index,
+            )
+            msg = "刪除數學公式 (image) 成功"
+        else:
+            result = delete_equation_omml(
+                document=doc,
+                expr_id=req.expr_id,
+                shape_id=req.shape_id,
+                slide_index=req.slide_index,
+            )
+            msg = "刪除數學公式 (OMML) 成功"
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message=msg)
     except Exception as e:
         _err_to_http(e)
 

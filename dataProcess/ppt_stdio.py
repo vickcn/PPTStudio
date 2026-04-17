@@ -17,6 +17,9 @@ PPTX 核心操作模組
 
 import os
 import json
+import re
+import tempfile
+import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
 # 實作「佈景主題 / 投影片背景」讀取（解析 pptx 內 XML）時請啟用標準庫：
@@ -1029,6 +1032,111 @@ class PPTDocument:
         result = self.get_textbox_style(slide_index=slide_index, shape_index=resolved_shape_index)
         result["notes"].extend(notes)
         return result
+
+    def drag_shape(
+            self,
+            slide_index: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+            left: Optional[int] = None,
+            top: Optional[int] = None,
+            delta_x: Optional[int] = None,
+            delta_y: Optional[int] = None,
+            width: Optional[int] = None,
+            height: Optional[int] = None,
+        ) -> Dict[str, Any]:
+        shape, resolved_shape_index = self._get_shape(
+            slide_index=slide_index,
+            shape_id=shape_id,
+            shape_index=shape_index,
+        )
+
+        if width is not None and width <= 0:
+            raise ValueError("width 必須 > 0")
+        if height is not None and height <= 0:
+            raise ValueError("height 必須 > 0")
+
+        dx = int(delta_x) if delta_x is not None else 0
+        dy = int(delta_y) if delta_y is not None else 0
+
+        before_bbox = {
+            "left": int(shape.left),
+            "top": int(shape.top),
+            "width": int(shape.width),
+            "height": int(shape.height),
+        }
+
+        target_left = int(left) if left is not None else before_bbox["left"] + dx
+        target_top = int(top) if top is not None else before_bbox["top"] + dy
+
+        if target_left < 0:
+            raise ValueError("left 不可小於 0")
+        if target_top < 0:
+            raise ValueError("top 不可小於 0")
+
+        shape.left = Emu(target_left)
+        shape.top = Emu(target_top)
+        if width is not None:
+            shape.width = Emu(int(width))
+        if height is not None:
+            shape.height = Emu(int(height))
+
+        has_text_frame = bool(getattr(shape, "has_text_frame", False))
+        text_preview: Optional[str] = None
+        if has_text_frame:
+            try:
+                text_preview = (shape.text_frame.text or "").strip()[:120]
+            except Exception:
+                text_preview = None
+
+        after_bbox = {
+            "left": int(shape.left),
+            "top": int(shape.top),
+            "width": int(shape.width),
+            "height": int(shape.height),
+        }
+
+        return {
+            "slide_index": slide_index,
+            "shape_index": resolved_shape_index,
+            "shape_id": getattr(shape, "shape_id", None),
+            "name": getattr(shape, "name", None),
+            "shape_type": str(getattr(shape, "shape_type", "")),
+            "has_text_frame": has_text_frame,
+            "text_preview": text_preview,
+            "before_bbox": before_bbox,
+            "after_bbox": after_bbox,
+            "delta_x": int(after_bbox["left"] - before_bbox["left"]),
+            "delta_y": int(after_bbox["top"] - before_bbox["top"]),
+        }
+
+    def drag_textbox(
+            self,
+            slide_index: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+            left: Optional[int] = None,
+            top: Optional[int] = None,
+            delta_x: Optional[int] = None,
+            delta_y: Optional[int] = None,
+            width: Optional[int] = None,
+            height: Optional[int] = None,
+        ) -> Dict[str, Any]:
+        _, resolved_shape_index = self._get_textbox_shape(
+            slide_index=slide_index,
+            shape_id=shape_id,
+            shape_index=shape_index,
+        )
+        return self.drag_shape(
+            slide_index=slide_index,
+            shape_index=resolved_shape_index,
+            left=left,
+            top=top,
+            delta_x=delta_x,
+            delta_y=delta_y,
+            width=width,
+            height=height,
+        )
 
     def delete_textbox(
             self,
@@ -2072,6 +2180,1131 @@ def clone_named_shape_from_template(
     }
 
 
+# ---------------------------------------------------------------------------
+# 數學式：規格見 issues/數學式.iss
+# - 主要能力：B 方案（OMML 原生方程式），見本檔後段 add_equation_omml 等骨架。
+# - 相容：M1（A：圖片方程式）仍保留，API 以 render_mode=image 轉呼叫 add_equation。
+# 統一資料模型欄位建議：expr_id, source_type, source_text, normalized_latex,
+# render_mode(image|omml), shape_id, slide_index, bbox
+#
+# 實作渲染與外部服務時可斟酌啟用（勿在骨架階段強制依賴）：
+# import uuid
+# import re
+# import tempfile
+# 本檔前段 try 區已有 matplotlib / PIL 時，可考慮 mathtext 或離線 LaTeX 轉 PNG
+#
+# B 方案（OMML）實作時常需直接組裝 / 插入 OOXML，可斟酌啟用：
+# from pptx.oxml.ns import qn
+# from pptx.oxml import parse_xml, OxmlElement
+# from lxml import etree  # 若需較細的 XML 操作（專案未強制依賴則維持註解）
+# ---------------------------------------------------------------------------
+
+
+_EQUATION_SHAPE_PREFIX = "EQN::"
+
+
+def _equation_shape_name(expr_id: str) -> str:
+    return f"{_EQUATION_SHAPE_PREFIX}{expr_id}"
+
+
+def _extract_expr_id_from_shape(shape: Any) -> Optional[str]:
+    shape_name = str(getattr(shape, "name", "") or "")
+    if shape_name.startswith(_EQUATION_SHAPE_PREFIX):
+        value = shape_name[len(_EQUATION_SHAPE_PREFIX):].strip()
+        return value or None
+    return None
+
+
+def _equation_image_dir(document: PPTDocument) -> str:
+    if document.file_path:
+        base_dir = os.path.dirname(os.path.abspath(document.file_path))
+    else:
+        base_dir = tempfile.gettempdir()
+    out_dir = os.path.join(base_dir, "_ppt_equations")
+    os.makedirs(out_dir, exist_ok=True)
+    return out_dir
+
+
+def _validate_rgb_tuple(color: Optional[Tuple[int, int, int]]) -> Optional[Tuple[int, int, int]]:
+    if color is None:
+        return None
+    if len(color) != 3:
+        raise ValueError("color 必須是 (R, G, B)")
+    r, g, b = int(color[0]), int(color[1]), int(color[2])
+    for value in (r, g, b):
+        if value < 0 or value > 255:
+            raise ValueError("color 每個值都必須介於 0~255")
+    return (r, g, b)
+
+
+def _strip_math_delimiters(text: str) -> Tuple[str, List[str]]:
+    notes: List[str] = []
+    out = text.strip()
+
+    if out.startswith("$$") and out.endswith("$$") and len(out) >= 4:
+        out = out[2:-2].strip()
+        notes.append("已移除 $$...$$ 包裝。")
+    elif out.startswith("$") and out.endswith("$") and len(out) >= 2:
+        out = out[1:-1].strip()
+        notes.append("已移除 $...$ 包裝。")
+    elif out.startswith("\\(") and out.endswith("\\)") and len(out) >= 4:
+        out = out[2:-2].strip()
+        notes.append("已移除 \\(...\\) 包裝。")
+    elif out.startswith("\\[") and out.endswith("\\]") and len(out) >= 4:
+        out = out[2:-2].strip()
+        notes.append("已移除 \\[...\\] 包裝。")
+
+    return out, notes
+
+
+def _check_brace_balance(text: str) -> None:
+    depth = 0
+    escaped = False
+    for ch in text:
+        if escaped:
+            escaped = False
+            continue
+        if ch == "\\":
+            escaped = True
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth < 0:
+                raise ValueError("latex 括號不平衡：出現多餘的 '}'")
+    if depth != 0:
+        raise ValueError("latex 括號不平衡：'{' 與 '}' 數量不一致")
+
+
+def _render_latex_to_png(
+        normalized_latex: str,
+        output_path: str,
+        font_size: Optional[int] = None,
+        color: Optional[Tuple[int, int, int]] = None,
+    ) -> Dict[str, Any]:
+    if not normalized_latex.strip():
+        raise ValueError("normalized_latex 不可為空")
+
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as _plt
+    except Exception as exc:
+        raise ImportError(f"渲染方程式需要 matplotlib：{exc}")
+
+    render_font_size = int(font_size) if font_size is not None else 30
+    if render_font_size <= 0:
+        raise ValueError("font_size 必須 > 0")
+
+    rgb = _validate_rgb_tuple(color) or (0, 0, 0)
+    color_float = (rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0)
+    latex_expr = normalized_latex.strip()
+    latex_wrapped = f"${latex_expr}$"
+
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+
+    fig = _plt.figure(figsize=(4, 2), dpi=220)
+    fig.patch.set_alpha(0.0)
+    ax = fig.add_subplot(111)
+    ax.axis("off")
+
+    try:
+        ax.text(
+            0.0,
+            0.5,
+            latex_wrapped,
+            fontsize=render_font_size,
+            color=color_float,
+            va="center",
+            ha="left",
+        )
+        fig.savefig(
+            output_path,
+            dpi=220,
+            transparent=True,
+            bbox_inches="tight",
+            pad_inches=0.08,
+        )
+    except Exception as exc:
+        raise ValueError(f"LaTeX 渲染失敗：{exc}")
+    finally:
+        _plt.close(fig)
+
+    width_px = None
+    height_px = None
+    if PIL_AVAILABLE:
+        try:
+            with Image.open(output_path) as img:
+                width_px, height_px = img.size
+        except Exception:
+            pass
+
+    return {
+        "output_path": os.path.abspath(output_path),
+        "width_px": width_px,
+        "height_px": height_px,
+        "font_size": render_font_size,
+        "color": [rgb[0], rgb[1], rgb[2]],
+    }
+
+
+def _find_equation_shape(
+        document: PPTDocument,
+        expr_id: Optional[str] = None,
+        shape_id: Optional[int] = None,
+        slide_index: Optional[int] = None,
+    ) -> Optional[Dict[str, Any]]:
+    if expr_id is None and shape_id is None:
+        raise ValueError("expr_id 與 shape_id 至少需提供一個")
+
+    if slide_index is not None:
+        _validate_slide_index(document.prs, slide_index)
+        target_slide_indices = [slide_index]
+    else:
+        target_slide_indices = list(range(len(document.prs.slides)))
+
+    for s_idx in target_slide_indices:
+        slide = document.prs.slides[s_idx]
+        for sh_idx, shape in enumerate(slide.shapes):
+            current_shape_id = getattr(shape, "shape_id", None)
+            current_expr_id = _extract_expr_id_from_shape(shape)
+
+            if expr_id is not None and current_expr_id != expr_id:
+                continue
+            if shape_id is not None and current_shape_id != shape_id:
+                continue
+
+            return {
+                "shape": shape,
+                "slide_index": s_idx,
+                "shape_index": sh_idx,
+                "shape_id": current_shape_id,
+                "expr_id": current_expr_id,
+            }
+    return None
+
+
+def parse_spoken_math_to_latex(text: str) -> Dict[str, Any]:
+    """
+    將口語描述轉成標準 LaTeX 字串（或結構化片段）。
+
+    預期回傳鍵（實作時補齊）：latex 或 normalized_latex、parse_confidence、notes
+    """
+    raw = (text or "").strip()
+    if not raw:
+        raise ValueError("text 不可為空")
+
+    converted = raw
+    notes: List[str] = []
+    replace_hit_count = 0
+
+    basic_replace = [
+        ("＋", "+"),
+        ("－", "-"),
+        ("×", r"\times"),
+        ("÷", "/"),
+        ("（", "("),
+        ("）", ")"),
+        ("，", ","),
+        ("。", ""),
+    ]
+    for src, dst in basic_replace:
+        if src in converted:
+            replace_hit_count += 1
+            converted = converted.replace(src, dst)
+
+    phrase_replace = [
+        ("加上", "+"),
+        ("加", "+"),
+        ("減掉", "-"),
+        ("減", "-"),
+        ("乘以", r"\times"),
+        ("乘", r"\times"),
+        ("除以", "/"),
+        ("除", "/"),
+        ("等於", "="),
+    ]
+    for src, dst in phrase_replace:
+        if src in converted:
+            replace_hit_count += 1
+            converted = converted.replace(src, dst)
+
+    fraction_pattern = re.compile(r"([^\s]+)\s*分之\s*([^\s]+)")
+    if fraction_pattern.search(converted):
+        replace_hit_count += 1
+        converted = fraction_pattern.sub(r"\\frac{\2}{\1}", converted)
+
+    power_patterns = [
+        (re.compile(r"([A-Za-z0-9\)\}]+)的平方"), r"\1^{2}"),
+        (re.compile(r"([A-Za-z0-9\)\}]+)平方"), r"\1^{2}"),
+        (re.compile(r"([A-Za-z0-9\)\}]+)的立方"), r"\1^{3}"),
+        (re.compile(r"([A-Za-z0-9\)\}]+)立方"), r"\1^{3}"),
+    ]
+    for pattern, repl in power_patterns:
+        if pattern.search(converted):
+            replace_hit_count += 1
+            converted = pattern.sub(repl, converted)
+
+    converted = re.sub(r"開根號\s*([A-Za-z0-9\(\)\+\-\*/]+)", r"\\sqrt{\1}", converted)
+    converted = re.sub(r"根號\s*([A-Za-z0-9\(\)\+\-\*/]+)", r"\\sqrt{\1}", converted)
+
+    converted = re.sub(r"\s+", " ", converted).strip()
+    if replace_hit_count == 0:
+        notes.append("未命中口語規則，已原樣當作 LaTeX 處理。")
+    else:
+        notes.append(f"口語規則命中 {replace_hit_count} 次。")
+
+    confidence = 0.45 + min(replace_hit_count * 0.08, 0.45)
+    return {
+        "latex": converted,
+        "normalized_latex": converted,
+        "parse_confidence": round(min(0.95, confidence), 4),
+        "notes": notes,
+    }
+
+
+def normalize_latex(latex: str) -> Dict[str, Any]:
+    """
+    清洗與檢查 LaTeX；供 image / 未來 omml 共用。
+
+    預期回傳鍵：normalized_latex、notes；語法問題時 parse_confidence 降低或錯誤訊息寫入 notes
+    """
+    if latex is None:
+        raise ValueError("latex 不可為 None")
+
+    raw = str(latex).strip()
+    if not raw:
+        raise ValueError("latex 不可為空")
+
+    stripped, notes = _strip_math_delimiters(raw)
+    normalized = re.sub(r"\s+", " ", stripped).strip()
+    if not normalized:
+        raise ValueError("latex 清洗後為空")
+
+    _check_brace_balance(normalized)
+
+    return {
+        "normalized_latex": normalized,
+        "parse_confidence": 1.0,
+        "notes": notes,
+    }
+
+
+def parse_math_expression(input_text: str, input_type: str) -> Dict[str, Any]:
+    """
+    可選單一入口：依 input_type 走口語轉換或只做 normalize。
+
+    input_type: spoken | latex（大小寫統一在實作內處理）
+    預期回傳：normalized_latex、parse_confidence、notes（對齊 POST /ppt/parse_math_expression）
+    """
+    source = (input_text or "").strip()
+    if not source:
+        raise ValueError("input_text 不可為空")
+
+    normalized_type = str(input_type or "latex").strip().lower()
+    if normalized_type not in {"spoken", "latex"}:
+        raise ValueError("input_type 只支援 spoken 或 latex")
+
+    notes: List[str] = []
+    if normalized_type == "spoken":
+        parsed = parse_spoken_math_to_latex(source)
+        normalized = normalize_latex(parsed.get("normalized_latex") or parsed.get("latex") or "")
+        notes.extend(parsed.get("notes", []))
+        notes.extend(normalized.get("notes", []))
+        confidence = min(
+            float(parsed.get("parse_confidence", 0.0)),
+            float(normalized.get("parse_confidence", 1.0)),
+        )
+    else:
+        normalized = normalize_latex(source)
+        notes.extend(normalized.get("notes", []))
+        confidence = float(normalized.get("parse_confidence", 1.0))
+
+    return {
+        "input_type": normalized_type,
+        "source_text": source,
+        "normalized_latex": normalized["normalized_latex"],
+        "parse_confidence": round(confidence, 4),
+        "notes": notes,
+    }
+
+
+def add_equation(
+        document: PPTDocument,
+        slide_index: int,
+        input_text: str,
+        input_type: str,
+        left: int,
+        top: int,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+        font_size: Optional[int] = None,
+        color: Optional[Tuple[int, int, int]] = None,
+    ) -> Dict[str, Any]:
+    """
+    M1：將式子渲染成圖片後插入指定頁（render_mode=image）。
+
+    預期回傳：expr_id, shape_id, slide_index, render_mode, normalized_latex, image_path,
+    bbox, notes（對齊 issues M1 出參）
+    """
+    _ensure_pptx_available()
+    _validate_slide_index(document.prs, slide_index)
+    if left < 0 or top < 0:
+        raise ValueError("left/top 必須 >= 0")
+
+    parsed = parse_math_expression(input_text=input_text, input_type=input_type)
+    normalized_latex = parsed["normalized_latex"]
+    expr_id = uuid.uuid4().hex
+
+    image_dir = _equation_image_dir(document)
+    image_path = os.path.join(image_dir, f"eq_{expr_id}.png")
+    render_result = _render_latex_to_png(
+        normalized_latex=normalized_latex,
+        output_path=image_path,
+        font_size=font_size,
+        color=color,
+    )
+
+    image_result = add_image(
+        document=document,
+        slide_index=slide_index,
+        image_path=image_path,
+        left=left,
+        top=top,
+        width=width,
+        height=height,
+        keep_aspect_ratio=(width is None or height is None),
+    )
+
+    notes: List[str] = list(parsed.get("notes", []))
+    inserted_shape, inserted_shape_index = document._get_shape(
+        slide_index=slide_index,
+        shape_id=image_result["shape_id"],
+    )
+    try:
+        inserted_shape.name = _equation_shape_name(expr_id)
+    except Exception as exc:
+        notes.append(f"設定 equation shape name 失敗: {exc}")
+
+    bbox = {
+        "left": int(inserted_shape.left),
+        "top": int(inserted_shape.top),
+        "width": int(inserted_shape.width),
+        "height": int(inserted_shape.height),
+    }
+
+    return {
+        "expr_id": expr_id,
+        "shape_id": int(image_result["shape_id"]),
+        "shape_index": int(inserted_shape_index),
+        "slide_index": int(slide_index),
+        "render_mode": "image",
+        "source_type": parsed["input_type"],
+        "source_text": parsed["source_text"],
+        "normalized_latex": normalized_latex,
+        "parse_confidence": parsed["parse_confidence"],
+        "image_path": render_result["output_path"],
+        "bbox": bbox,
+        "notes": notes,
+    }
+
+
+def update_equation(
+        document: PPTDocument,
+        input_text: str,
+        input_type: str,
+        expr_id: Optional[str] = None,
+        shape_id: Optional[int] = None,
+        slide_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    """
+    依 expr_id 或 shape_id 找到既有方程式圖片，重新解析並置換圖片或更新關聯檔。
+
+    預期回傳：expr_id, shape_id, updated, normalized_latex, image_path, notes
+    """
+    _ensure_pptx_available()
+
+    if expr_id is None and shape_id is None:
+        raise ValueError("expr_id 與 shape_id 至少需提供一個")
+
+    target = _find_equation_shape(
+        document=document,
+        expr_id=expr_id,
+        shape_id=shape_id,
+        slide_index=slide_index,
+    )
+    if target is None:
+        return {
+            "expr_id": expr_id,
+            "shape_id": shape_id,
+            "updated": False,
+            "normalized_latex": None,
+            "image_path": None,
+            "notes": ["找不到對應方程式 shape。"],
+        }
+
+    target_shape = target["shape"]
+    target_slide_index = int(target["slide_index"])
+    old_shape_id = int(target["shape_id"])
+    resolved_expr_id = expr_id or target.get("expr_id") or uuid.uuid4().hex
+
+    parsed = parse_math_expression(input_text=input_text, input_type=input_type)
+    normalized_latex = parsed["normalized_latex"]
+    notes: List[str] = list(parsed.get("notes", []))
+
+    old_left = int(target_shape.left)
+    old_top = int(target_shape.top)
+    old_width = int(target_shape.width)
+    old_height = int(target_shape.height)
+
+    image_dir = _equation_image_dir(document)
+    image_path = os.path.join(image_dir, f"eq_{resolved_expr_id}.png")
+    render_result = _render_latex_to_png(
+        normalized_latex=normalized_latex,
+        output_path=image_path,
+        font_size=None,
+        color=None,
+    )
+
+    added = add_image(
+        document=document,
+        slide_index=target_slide_index,
+        image_path=render_result["output_path"],
+        left=old_left,
+        top=old_top,
+        width=old_width,
+        height=old_height,
+        keep_aspect_ratio=False,
+    )
+    new_shape_id = int(added["shape_id"])
+    new_shape, new_shape_index = document._get_shape(
+        slide_index=target_slide_index,
+        shape_id=new_shape_id,
+    )
+    try:
+        new_shape.name = _equation_shape_name(resolved_expr_id)
+    except Exception as exc:
+        notes.append(f"設定更新後 equation shape name 失敗: {exc}")
+
+    delete_result = delete_shape(
+        document=document,
+        slide_index=target_slide_index,
+        shape_id=old_shape_id,
+    )
+    notes.append(f"已移除舊方程式 shape_id={old_shape_id}")
+
+    bbox = {
+        "left": int(new_shape.left),
+        "top": int(new_shape.top),
+        "width": int(new_shape.width),
+        "height": int(new_shape.height),
+    }
+
+    return {
+        "expr_id": resolved_expr_id,
+        "shape_id": new_shape_id,
+        "shape_index": int(new_shape_index),
+        "slide_index": target_slide_index,
+        "updated": True,
+        "render_mode": "image",
+        "normalized_latex": normalized_latex,
+        "parse_confidence": parsed["parse_confidence"],
+        "image_path": render_result["output_path"],
+        "bbox": bbox,
+        "replaced_shape": delete_result,
+        "notes": notes,
+    }
+
+
+def delete_equation(
+        document: PPTDocument,
+        expr_id: Optional[str] = None,
+        shape_id: Optional[int] = None,
+        slide_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    """
+    刪除方程式對應的圖片 shape（與 expr_id 對應之中繼資料若有的話一併清理）。
+
+    預期回傳：deleted, expr_id, shape_id, notes
+    """
+    _ensure_pptx_available()
+
+    if expr_id is None and shape_id is None:
+        raise ValueError("expr_id 與 shape_id 至少需提供一個")
+
+    target = _find_equation_shape(
+        document=document,
+        expr_id=expr_id,
+        shape_id=shape_id,
+        slide_index=slide_index,
+    )
+    if target is None:
+        return {
+            "deleted": False,
+            "expr_id": expr_id,
+            "shape_id": shape_id,
+            "notes": ["找不到對應方程式 shape。"],
+        }
+
+    resolved_expr_id = expr_id or target.get("expr_id")
+    resolved_shape_id = int(target["shape_id"])
+    resolved_slide_index = int(target["slide_index"])
+    result = delete_shape(
+        document=document,
+        slide_index=resolved_slide_index,
+        shape_id=resolved_shape_id,
+    )
+    return {
+        "deleted": True,
+        "expr_id": resolved_expr_id,
+        "shape_id": resolved_shape_id,
+        "slide_index": resolved_slide_index,
+        "result": result,
+        "notes": [],
+    }
+
+
+# ---------------------------------------------------------------------------
+# M2 / B 方案：PPT 原生方程式（OMML）骨架（主要功能路徑）
+# 建議與 A 方案共用 parse_math_expression / normalize_latex，差異在「插入 a:oMath / m:oMath」
+# 與版面容器（例如 wsp 內 a:t 改為 a:oMathPara）。
+# ---------------------------------------------------------------------------
+
+
+def _latex_to_omml_ooxml(normalized_latex: str) -> Any:
+    """
+    將已正規化的 LaTeX 轉成 Office Math ML（OMML）對應的 oxml 片段或位元組。
+
+    實作提示：
+    - 可評估：MathML 中繼、第三方 LaTeX->OMML、pandoc、或僅支援子集合手刻 m:oMath
+    - 回傳型別可為 lxml Element 或 pptx 相容的 OxmlElement 樹，由 _insert_omml_math_block 承接
+    """
+    normalized = normalize_latex(normalized_latex).get("normalized_latex", "")
+    if not normalized:
+        raise ValueError("normalized_latex 不可為空")
+
+    try:
+        from lxml import etree
+    except Exception as exc:
+        raise ImportError(f"OMML 需依賴 lxml：{exc}")
+
+    # 優先走 pandoc 產生結構化 OMML（例如分數/矩陣/上下標），
+    # 若環境沒有 pandoc 或轉換失敗，才退回簡化線性文字 OMML。
+    try:
+        import subprocess
+        import zipfile
+
+        with tempfile.TemporaryDirectory(prefix="ppt_omml_") as td:
+            td_path = os.path.abspath(td)
+            md_path = os.path.join(td_path, "expr.md")
+            docx_path = os.path.join(td_path, "expr.docx")
+
+            with open(md_path, "w", encoding="utf-8") as f:
+                f.write(f"$${normalized}$$\n")
+
+            proc = subprocess.run(
+                ["pandoc", md_path, "-t", "docx", "-o", docx_path],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if proc.returncode == 0 and os.path.exists(docx_path):
+                with zipfile.ZipFile(docx_path, "r") as zf:
+                    doc_xml = zf.read("word/document.xml")
+                doc_root = etree.fromstring(doc_xml)
+                m_ns = "http://schemas.openxmlformats.org/officeDocument/2006/math"
+                omml = doc_root.find(f".//{{{m_ns}}}oMath")
+                if omml is not None:
+                    result = deepcopy(omml)
+                    etree.cleanup_namespaces(result)
+                    return result
+    except Exception:
+        pass
+
+    linear_text = normalized
+    linear_text = re.sub(r"\\frac\s*\{([^{}]+)\}\{([^{}]+)\}", r"(\1)/(\2)", linear_text)
+    linear_text = re.sub(r"\\sqrt\s*\{([^{}]+)\}", r"√(\1)", linear_text)
+    linear_text = linear_text.replace(r"\times", "×")
+    linear_text = linear_text.replace(r"\cdot", "·")
+    linear_text = linear_text.replace(r"\leq", "≤")
+    linear_text = linear_text.replace(r"\geq", "≥")
+    linear_text = linear_text.replace(r"\neq", "≠")
+    linear_text = linear_text.replace(r"\infty", "∞")
+    linear_text = linear_text.replace(r"\sum", "∑")
+    linear_text = linear_text.replace(r"\Sigma", "Σ")
+    linear_text = linear_text.replace(r"\alpha", "α")
+    linear_text = linear_text.replace(r"\beta", "β")
+    linear_text = linear_text.replace(r"\gamma", "γ")
+    linear_text = linear_text.replace(r"\theta", "θ")
+    linear_text = linear_text.replace(r"\lambda", "λ")
+    linear_text = linear_text.replace(r"\mu", "μ")
+    linear_text = linear_text.replace(r"\pi", "π")
+    linear_text = linear_text.replace(r"\phi", "φ")
+    linear_text = linear_text.replace(r"\{", "{").replace(r"\}", "}")
+    linear_text = linear_text.replace(r"\left", "").replace(r"\right", "")
+    linear_text = re.sub(r"\\begin\{[^{}]+\}", "", linear_text)
+    linear_text = re.sub(r"\\end\{[^{}]+\}", "", linear_text)
+    linear_text = linear_text.replace(r"\,", " ")
+    linear_text = linear_text.replace(r"\\", "; ")
+    linear_text = linear_text.replace("&", " ")
+    linear_text = re.sub(r"\s+", " ", linear_text).strip()
+
+    m_ns = "http://schemas.openxmlformats.org/officeDocument/2006/math"
+    o_math = etree.Element(f"{{{m_ns}}}oMath", nsmap={"m": m_ns})
+    run = etree.SubElement(o_math, f"{{{m_ns}}}r")
+    text_node = etree.SubElement(run, f"{{{m_ns}}}t")
+    text_node.text = linear_text
+    return o_math
+
+
+def _ensure_omml_o_math_element(omml_element: Any) -> Any:
+    try:
+        from lxml import etree
+    except Exception as exc:
+        raise ImportError(f"OMML 需依賴 lxml：{exc}")
+
+    if omml_element is None:
+        raise ValueError("omml_element 不可為 None")
+
+    candidate = deepcopy(omml_element)
+    local_name = etree.QName(candidate).localname
+    if local_name == "oMath":
+        return candidate
+    if local_name == "oMathPara":
+        child = next((c for c in list(candidate) if etree.QName(c).localname == "oMath"), None)
+        if child is None:
+            raise ValueError("m:oMathPara 內找不到 m:oMath")
+        return deepcopy(child)
+    raise ValueError("omml_element 必須是 m:oMath 或 m:oMathPara")
+
+
+def _normalize_text_runs(runs: Optional[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+    normalized: List[Dict[str, Any]] = []
+    if not runs:
+        return normalized
+    for run in runs:
+        if not isinstance(run, dict):
+            continue
+        text = str(run.get("text", ""))
+        if text == "":
+            continue
+        entry: Dict[str, Any] = {"text": text}
+        if run.get("font_name") is not None:
+            entry["font_name"] = str(run.get("font_name"))
+        if run.get("font_size") is not None:
+            try:
+                size = int(run.get("font_size"))
+                if size > 0:
+                    entry["font_size"] = size
+            except Exception:
+                pass
+        if run.get("bold") is not None:
+            entry["bold"] = bool(run.get("bold"))
+        if run.get("italic") is not None:
+            entry["italic"] = bool(run.get("italic"))
+        color = run.get("font_color")
+        if isinstance(color, (list, tuple)) and len(color) == 3:
+            try:
+                r, g, b = int(color[0]), int(color[1]), int(color[2])
+                if all(0 <= v <= 255 for v in (r, g, b)):
+                    entry["font_color"] = [r, g, b]
+            except Exception:
+                pass
+        normalized.append(entry)
+    return normalized
+
+
+def _append_a_text_run(paragraph: Any, run_spec: Dict[str, Any], a_ns: str) -> None:
+    try:
+        from lxml import etree
+    except Exception as exc:
+        raise ImportError(f"OMML 需依賴 lxml：{exc}")
+
+    text = str(run_spec.get("text", ""))
+    if text == "":
+        return
+
+    run = etree.SubElement(paragraph, f"{{{a_ns}}}r")
+    r_pr = etree.SubElement(run, f"{{{a_ns}}}rPr")
+
+    font_size = run_spec.get("font_size")
+    if isinstance(font_size, int) and font_size > 0:
+        r_pr.set("sz", str(font_size * 100))
+
+    if run_spec.get("bold") is True:
+        r_pr.set("b", "1")
+    if run_spec.get("italic") is True:
+        r_pr.set("i", "1")
+
+    font_name = run_spec.get("font_name")
+    if isinstance(font_name, str) and font_name.strip():
+        typeface = font_name.strip()
+        etree.SubElement(r_pr, f"{{{a_ns}}}latin", typeface=typeface)
+        etree.SubElement(r_pr, f"{{{a_ns}}}ea", typeface=typeface)
+        etree.SubElement(r_pr, f"{{{a_ns}}}cs", typeface=typeface)
+
+    color = run_spec.get("font_color")
+    if isinstance(color, (list, tuple)) and len(color) == 3:
+        r, g, b = int(color[0]), int(color[1]), int(color[2])
+        solid_fill = etree.SubElement(r_pr, f"{{{a_ns}}}solidFill")
+        etree.SubElement(solid_fill, f"{{{a_ns}}}srgbClr", val=f"{r:02X}{g:02X}{b:02X}")
+
+    t = etree.SubElement(run, f"{{{a_ns}}}t")
+    if text != text.strip() or "  " in text:
+        t.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
+    t.text = text
+
+
+def _write_omml_to_shape(
+        shape: Any,
+        omml_element: Any,
+        prefix_runs: Optional[List[Dict[str, Any]]] = None,
+        suffix_runs: Optional[List[Dict[str, Any]]] = None,
+    ) -> None:
+    omml_o_math = _ensure_omml_o_math_element(omml_element)
+    try:
+        from lxml import etree
+    except Exception as exc:
+        raise ImportError(f"OMML 需依賴 lxml：{exc}")
+
+    a14_ns = "http://schemas.microsoft.com/office/drawing/2010/main"
+    a_ns = "http://schemas.openxmlformats.org/drawingml/2006/main"
+    m_ns = "http://schemas.openxmlformats.org/officeDocument/2006/math"
+    mc_ns = "http://schemas.openxmlformats.org/markup-compatibility/2006"
+    try:
+        etree.register_namespace("mc", mc_ns)
+        etree.register_namespace("a14", a14_ns)
+        etree.register_namespace("m", m_ns)
+    except Exception:
+        pass
+
+    try:
+        slide_root = shape.part.slide._element
+        ignorable_attr = f"{{{mc_ns}}}Ignorable"
+        current = str(slide_root.get(ignorable_attr) or "").strip()
+        tokens = [t for t in current.split() if t]
+        if "a14" not in tokens:
+            tokens.append("a14")
+        slide_root.set(ignorable_attr, " ".join(tokens))
+    except Exception:
+        # 保持非阻斷：若無法補 ignorable，也不影響既有流程。
+        pass
+
+    a14_m = etree.Element(f"{{{a14_ns}}}m", nsmap={"a14": a14_ns, "m": m_ns})
+    a14_m.append(omml_o_math)
+
+    tx_body = getattr(shape._element, "txBody", None)
+    if tx_body is None:
+        raise ValueError("目標 shape 無 txBody，無法插入 OMML")
+
+    paragraph = tx_body.find(qn("a:p"))
+    if paragraph is None:
+        paragraph = OxmlElement("a:p")
+        tx_body.append(paragraph)
+
+    for child in list(paragraph):
+        paragraph.remove(child)
+
+    fallback_text = "".join((node.text or "") for node in omml_o_math.findall(f".//{{{m_ns}}}t")).strip()
+    if not fallback_text:
+        fallback_text = " "
+
+    ac = etree.Element(f"{{{mc_ns}}}AlternateContent", nsmap={"mc": mc_ns, "a14": a14_ns, "a": a_ns, "m": m_ns})
+    choice = etree.SubElement(ac, f"{{{mc_ns}}}Choice", Requires="a14")
+    choice.append(a14_m)
+    fallback = etree.SubElement(ac, f"{{{mc_ns}}}Fallback")
+    a_run = etree.SubElement(fallback, f"{{{a_ns}}}r")
+    etree.SubElement(a_run, f"{{{a_ns}}}rPr")
+    a_t = etree.SubElement(a_run, f"{{{a_ns}}}t")
+    a_t.text = fallback_text
+
+    for run_spec in _normalize_text_runs(prefix_runs):
+        _append_a_text_run(paragraph=paragraph, run_spec=run_spec, a_ns=a_ns)
+
+    paragraph.append(ac)
+
+    for run_spec in _normalize_text_runs(suffix_runs):
+        _append_a_text_run(paragraph=paragraph, run_spec=run_spec, a_ns=a_ns)
+
+    paragraph.append(OxmlElement("a:endParaRPr"))
+
+
+def _insert_omml_math_block(
+        document: PPTDocument,
+        slide_index: int,
+        left: int,
+        top: int,
+        width: Optional[int],
+        height: Optional[int],
+        omml_element: Any,
+        expr_id: str,
+        prefix_runs: Optional[List[Dict[str, Any]]] = None,
+        suffix_runs: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+    """
+    在指定頁建立可編輯方程式容器，並把 OMML 片段掛進 shape 的 txBody / body 結構。
+
+    實作提示：
+    - 可能需新增圖形文字方塊後，於 a:p / a:r 內插入 a:oMathPara
+    - expr_id 建議寫入 shape.name（沿用 _equation_shape_name）供 update/delete 尋址
+    """
+    _ensure_pptx_available()
+    _validate_slide_index(document.prs, slide_index)
+    if left < 0 or top < 0:
+        raise ValueError("left/top 必須 >= 0")
+
+    resolved_width = width if width is not None else int(document.prs.slide_width * 0.72)
+    resolved_height = height if height is not None else int(document.prs.slide_height * 0.10)
+    if resolved_width <= 0 or resolved_height <= 0:
+        raise ValueError("width/height 必須 > 0")
+
+    slide = document.prs.slides[slide_index]
+    shape = slide.shapes.add_textbox(
+        Emu(left),
+        Emu(top),
+        Emu(int(resolved_width)),
+        Emu(int(resolved_height)),
+    )
+    try:
+        shape.name = _equation_shape_name(expr_id)
+    except Exception:
+        pass
+
+    _write_omml_to_shape(
+        shape=shape,
+        omml_element=omml_element,
+        prefix_runs=prefix_runs,
+        suffix_runs=suffix_runs,
+    )
+    _, shape_index = document._get_shape(slide_index=slide_index, shape_id=getattr(shape, "shape_id", None))
+
+    try:
+        from lxml import etree
+        omml_fragment_ref = etree.tostring(_ensure_omml_o_math_element(omml_element), encoding="unicode")
+    except Exception:
+        omml_fragment_ref = None
+
+    return {
+        "slide_index": int(slide_index),
+        "shape_id": int(shape.shape_id),
+        "shape_index": int(shape_index),
+        "shape_name": getattr(shape, "name", None),
+        "omml_write_mode": "mc_alternate_content_a14",
+        "bbox": {
+            "left": int(shape.left),
+            "top": int(shape.top),
+            "width": int(shape.width),
+            "height": int(shape.height),
+        },
+        "omml_fragment_ref": omml_fragment_ref,
+    }
+
+
+def add_equation_omml(
+        document: PPTDocument,
+        slide_index: int,
+        input_text: str,
+        input_type: str,
+        left: int,
+        top: int,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+        font_size: Optional[int] = None,
+        color: Optional[Tuple[int, int, int]] = None,
+        prefix_runs: Optional[List[Dict[str, Any]]] = None,
+        suffix_runs: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+    """
+    B 方案：在指定頁插入可編輯的 OMML 方程式（render_mode=omml）。
+
+    預期回傳（對齊統一模型）：expr_id, shape_id, slide_index, render_mode:omml,
+    normalized_latex, omml_fragment_ref 或內嵌摘要、bbox、notes；image_path 可為 None。
+    font_size / color 可對應 w:rPr / m:rFonts（實作時再對應）。
+    """
+    _ensure_pptx_available()
+    _validate_slide_index(document.prs, slide_index)
+
+    parsed = parse_math_expression(input_text=input_text, input_type=input_type)
+    normalized_latex = parsed["normalized_latex"]
+    omml = _latex_to_omml_ooxml(normalized_latex)
+    expr_id = uuid.uuid4().hex
+
+    inserted = _insert_omml_math_block(
+        document=document,
+        slide_index=slide_index,
+        left=left,
+        top=top,
+        width=width,
+        height=height,
+        omml_element=omml,
+        expr_id=expr_id,
+        prefix_runs=prefix_runs,
+        suffix_runs=suffix_runs,
+    )
+
+    notes: List[str] = list(parsed.get("notes", []))
+    if font_size is not None:
+        notes.append("OMML 模式目前未套用 font_size 到方程式 run。")
+    if color is not None:
+        notes.append("OMML 模式目前未套用 color 到方程式 run。")
+    notes.append("OMML 已嘗試使用結構化轉換；若環境限制則退回簡化路徑。")
+
+    return {
+        "expr_id": expr_id,
+        "shape_id": inserted["shape_id"],
+        "shape_index": inserted["shape_index"],
+        "slide_index": inserted["slide_index"],
+        "render_mode": "omml",
+        "source_type": parsed["input_type"],
+        "source_text": parsed["source_text"],
+        "normalized_latex": normalized_latex,
+        "parse_confidence": parsed["parse_confidence"],
+        "image_path": None,
+        "omml_write_mode": inserted.get("omml_write_mode"),
+        "omml_fragment_ref": inserted.get("omml_fragment_ref"),
+        "bbox": inserted["bbox"],
+        "notes": notes,
+    }
+
+
+def update_equation_omml(
+        document: PPTDocument,
+        input_text: str,
+        input_type: str,
+        expr_id: Optional[str] = None,
+        shape_id: Optional[int] = None,
+        slide_index: Optional[int] = None,
+        prefix_runs: Optional[List[Dict[str, Any]]] = None,
+        suffix_runs: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+    """
+    B 方案：更新既有 OMML 方程式內容，盡量維持版面與 shape 不漂移。
+
+    實作提示：
+    - 以 _find_equation_shape 或另建 _find_omml_equation_shape 定位 a:oMath 節點
+    - 置換 m:oMath 子樹或更新 Office Math 區塊，避免整顆 shape 刪除重建
+    """
+    _ensure_pptx_available()
+    if expr_id is None and shape_id is None:
+        raise ValueError("expr_id 與 shape_id 至少需提供一個")
+
+    target = _find_equation_shape(
+        document=document,
+        expr_id=expr_id,
+        shape_id=shape_id,
+        slide_index=slide_index,
+    )
+    if target is None:
+        return {
+            "expr_id": expr_id,
+            "shape_id": shape_id,
+            "updated": False,
+            "render_mode": "omml",
+            "normalized_latex": None,
+            "omml_fragment_ref": None,
+            "notes": ["找不到對應方程式 shape。"],
+        }
+
+    parsed = parse_math_expression(input_text=input_text, input_type=input_type)
+    normalized_latex = parsed["normalized_latex"]
+    omml = _latex_to_omml_ooxml(normalized_latex)
+
+    target_shape = target["shape"]
+    resolved_slide_index = int(target["slide_index"])
+    resolved_shape_id = int(target["shape_id"])
+    resolved_shape_index = int(target["shape_index"])
+    resolved_expr_id = expr_id or target.get("expr_id") or uuid.uuid4().hex
+
+    _write_omml_to_shape(
+        shape=target_shape,
+        omml_element=omml,
+        prefix_runs=prefix_runs,
+        suffix_runs=suffix_runs,
+    )
+    try:
+        target_shape.name = _equation_shape_name(resolved_expr_id)
+    except Exception:
+        pass
+
+    try:
+        from lxml import etree
+        omml_fragment_ref = etree.tostring(_ensure_omml_o_math_element(omml), encoding="unicode")
+    except Exception:
+        omml_fragment_ref = None
+
+    return {
+        "expr_id": resolved_expr_id,
+        "shape_id": resolved_shape_id,
+        "shape_index": resolved_shape_index,
+        "slide_index": resolved_slide_index,
+        "updated": True,
+        "render_mode": "omml",
+        "normalized_latex": normalized_latex,
+        "parse_confidence": parsed["parse_confidence"],
+        "image_path": None,
+        "omml_write_mode": "mc_alternate_content_a14",
+        "omml_fragment_ref": omml_fragment_ref,
+        "bbox": {
+            "left": int(target_shape.left),
+            "top": int(target_shape.top),
+            "width": int(target_shape.width),
+            "height": int(target_shape.height),
+        },
+        "notes": list(parsed.get("notes", [])),
+    }
+
+
+def delete_equation_omml(
+        document: PPTDocument,
+        expr_id: Optional[str] = None,
+        shape_id: Optional[int] = None,
+        slide_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    """
+    B 方案：刪除 OMML 方程式對應 shape（或僅清空 oMath 區塊，依產品策略決定）。
+
+    實作提示：
+    - 若整顆 shape 皆為方程式容器，可直接 delete_shape；若混合文字則只移除 oMath 節點
+    """
+    _ensure_pptx_available()
+    if expr_id is None and shape_id is None:
+        raise ValueError("expr_id 與 shape_id 至少需提供一個")
+
+    target = _find_equation_shape(
+        document=document,
+        expr_id=expr_id,
+        shape_id=shape_id,
+        slide_index=slide_index,
+    )
+    if target is None:
+        return {
+            "deleted": False,
+            "expr_id": expr_id,
+            "shape_id": shape_id,
+            "render_mode": "omml",
+            "notes": ["找不到對應方程式 shape。"],
+        }
+
+    resolved_expr_id = expr_id or target.get("expr_id")
+    resolved_shape_id = int(target["shape_id"])
+    resolved_slide_index = int(target["slide_index"])
+    result = delete_shape(
+        document=document,
+        slide_index=resolved_slide_index,
+        shape_id=resolved_shape_id,
+    )
+    return {
+        "deleted": True,
+        "expr_id": resolved_expr_id,
+        "shape_id": resolved_shape_id,
+        "slide_index": resolved_slide_index,
+        "render_mode": "omml",
+        "result": result,
+        "notes": [],
+    }
+
+
 def add_image(
         document: PPTDocument,
         slide_index: int,
@@ -2256,6 +3489,56 @@ def set_textbox_style(
         line_style=line_style,
         line_color=line_color,
         line_width=line_width,
+    )
+
+
+def drag_shape(
+        document: PPTDocument,
+        slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        left: Optional[int] = None,
+        top: Optional[int] = None,
+        delta_x: Optional[int] = None,
+        delta_y: Optional[int] = None,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    return document.drag_shape(
+        slide_index=slide_index,
+        shape_id=shape_id,
+        shape_index=shape_index,
+        left=left,
+        top=top,
+        delta_x=delta_x,
+        delta_y=delta_y,
+        width=width,
+        height=height,
+    )
+
+
+def drag_textbox(
+        document: PPTDocument,
+        slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        left: Optional[int] = None,
+        top: Optional[int] = None,
+        delta_x: Optional[int] = None,
+        delta_y: Optional[int] = None,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    return document.drag_textbox(
+        slide_index=slide_index,
+        shape_id=shape_id,
+        shape_index=shape_index,
+        left=left,
+        top=top,
+        delta_x=delta_x,
+        delta_y=delta_y,
+        width=width,
+        height=height,
     )
 
 

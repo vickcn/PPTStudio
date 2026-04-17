@@ -641,6 +641,68 @@ async def set_textbox_style(
 
 
 @mcp.tool()
+async def drag_shape(
+    file_path: str,
+    slide_index: int,
+    shape_id: Optional[int] = None,
+    shape_index: Optional[int] = None,
+    left: Optional[int] = None,
+    top: Optional[int] = None,
+    delta_x: Optional[int] = None,
+    delta_y: Optional[int] = None,
+    width: Optional[int] = None,
+    height: Optional[int] = None,
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """拖拉任意 shape（圖片、一般圖形、文字框），支援 left/top 絕對定位或 delta_x/delta_y 相對位移。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+        "left": left,
+        "top": top,
+        "delta_x": delta_x,
+        "delta_y": delta_y,
+        "width": width,
+        "height": height,
+        "save_as": save_as,
+    }
+    return await _request("POST", "/ppt/drag_shape", json_body=body)
+
+
+@mcp.tool()
+async def drag_textbox(
+    file_path: str,
+    slide_index: int,
+    shape_id: Optional[int] = None,
+    shape_index: Optional[int] = None,
+    left: Optional[int] = None,
+    top: Optional[int] = None,
+    delta_x: Optional[int] = None,
+    delta_y: Optional[int] = None,
+    width: Optional[int] = None,
+    height: Optional[int] = None,
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """拖拉指定文字框位置（可用絕對 left/top 或相對 delta_x/delta_y，並可選調整寬高）。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+        "left": left,
+        "top": top,
+        "delta_x": delta_x,
+        "delta_y": delta_y,
+        "width": width,
+        "height": height,
+        "save_as": save_as,
+    }
+    return await _request("POST", "/ppt/drag_textbox", json_body=body)
+
+
+@mcp.tool()
 async def delete_textbox(
     file_path: str,
     slide_index: int,
@@ -657,6 +719,210 @@ async def delete_textbox(
         "save_as": save_as,
     }
     return await _request("POST", "/ppt/delete_textbox", json_body=body)
+
+
+@mcp.tool()
+async def add_wordart_like_textbox(
+        file_path: str,
+        slide_index: int,
+        text: str,
+        left: int,
+        top: int,
+        width: int,
+        height: int,
+        font_size: int = 28,
+        bold: bool = True,
+        font_name: Optional[str] = None,
+        font_color: Optional[List[int]] = None,
+        align: str = "center",
+        save_as: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    """在指定頁以文字框模擬 WordArt 風格（對應 POST /ppt/add_wordart_like_textbox）。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "text": text,
+        "left": left,
+        "top": top,
+        "width": width,
+        "height": height,
+        "font_size": font_size,
+        "bold": bold,
+        "font_name": font_name,
+        "font_color": _clean_rgb(font_color) if font_color is not None else None,
+        "align": align,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/add_wordart_like_textbox", json_body=body)
+
+
+@mcp.tool()
+async def update_wordart_text(
+        file_path: str,
+        slide_index: int,
+        new_text: str,
+        shape_name: Optional[str] = None,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        save_as: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    """更新命名或指定 id/index 的 WordArt 類文字（對應 POST /ppt/update_wordart_text）。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "new_text": new_text,
+        "shape_name": shape_name,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/update_wordart_text", json_body=body)
+
+
+@mcp.tool()
+async def delete_shape(
+        file_path: str,
+        slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        save_as: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    """刪除指定頁上的任意 shape（對應 POST /ppt/delete_shape）。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/delete_shape", json_body=body)
+
+
+@mcp.tool()
+async def clone_named_shape_from_template(
+        file_path: str,
+        slide_index: int,
+        shape_name: str,
+        new_text: str = "",
+        left: Optional[int] = None,
+        top: Optional[int] = None,
+        save_as: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    """依 shape 名稱從同頁複製範本並可選填新文字（對應 POST /ppt/clone_named_shape_from_template）。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "shape_name": shape_name,
+        "new_text": new_text,
+        "left": left,
+        "top": top,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/clone_named_shape_from_template", json_body=body)
+
+
+@mcp.tool()
+async def parse_math_expression(input_text: str, input_type: str = "latex") -> Dict[str, Any]:
+    """解析口語或 LaTeX（POST /ppt/parse_math_expression），不修改簡報檔。"""
+    return await _request(
+        "POST",
+        "/ppt/parse_math_expression",
+        json_body={"input_text": input_text, "input_type": input_type},
+    )
+
+
+@mcp.tool()
+async def add_equation(
+        file_path: str,
+        slide_index: int,
+        input_text: str,
+        input_type: str = "latex",
+        left: int = 0,
+        top: int = 0,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+        font_size: Optional[int] = None,
+        color: Optional[List[int]] = None,
+        prefix_runs: Optional[List[Dict[str, Any]]] = None,
+        suffix_runs: Optional[List[Dict[str, Any]]] = None,
+        render_mode: str = "omml",
+        save_as: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    """新增數學式：預設 B（OMML，POST /ppt/add_equation）；render_mode=image 為 M1 圖片。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "input_text": input_text,
+        "input_type": input_type,
+        "left": left,
+        "top": top,
+        "width": width,
+        "height": height,
+        "font_size": font_size,
+        "color": _clean_rgb(color) if color is not None else None,
+        "prefix_runs": prefix_runs,
+        "suffix_runs": suffix_runs,
+        "render_mode": render_mode,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/add_equation", json_body=body)
+
+
+@mcp.tool()
+async def update_equation(
+        file_path: str,
+        input_text: str,
+        input_type: str = "latex",
+        expr_id: Optional[str] = None,
+        shape_id: Optional[int] = None,
+        slide_index: Optional[int] = None,
+        prefix_runs: Optional[List[Dict[str, Any]]] = None,
+        suffix_runs: Optional[List[Dict[str, Any]]] = None,
+        render_mode: str = "omml",
+        save_as: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    """更新數學式：預設 B（OMML）；render_mode=image 為圖片方程式。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "input_text": input_text,
+        "input_type": input_type,
+        "expr_id": expr_id,
+        "shape_id": shape_id,
+        "slide_index": slide_index,
+        "prefix_runs": prefix_runs,
+        "suffix_runs": suffix_runs,
+        "render_mode": render_mode,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/update_equation", json_body=body)
+
+
+@mcp.tool()
+async def delete_equation(
+        file_path: str,
+        expr_id: Optional[str] = None,
+        shape_id: Optional[int] = None,
+        slide_index: Optional[int] = None,
+        render_mode: str = "omml",
+        save_as: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    """刪除數學式：預設 B（OMML）；render_mode=image 為圖片方程式。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "expr_id": expr_id,
+        "shape_id": shape_id,
+        "slide_index": slide_index,
+        "render_mode": render_mode,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/delete_equation", json_body=body)
 
 
 @mcp.tool()
