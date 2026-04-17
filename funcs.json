@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-14T15:45:41.069252",
+  "generated_at": "2026-04-17T09:11:55.690942",
   "base_url": "http://10.1.3.127:7017",
   "provider": "openai",
   "model": "gpt35_chat",
@@ -10,8 +10,12 @@
     "C:\\ML_HOME\\PPTStudio\\dataProcess\\ppt_stdio.py",
     "C:\\ML_HOME\\PPTStudio\\mcp_server.py",
     "C:\\ML_HOME\\PPTStudio\\PPTStudio.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp\\test_textbox_transparency_compare.py",
     "C:\\ML_HOME\\PPTStudio\\tmp_io\\test_all_simple.py",
-    "C:\\ML_HOME\\PPTStudio\\tmp_io\\test_new.py"
+    "C:\\ML_HOME\\PPTStudio\\tmp_io\\test_new.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp_math\\generate_math_ppt_via_api.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp_math\\generate_math_ppt_via_api_omml.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp_math\\generate_text_math_inline_via_api.py"
   ],
   "files": {
     "C:\\ML_HOME\\PPTStudio\\api_server.py": {
@@ -20,87 +24,167 @@
         {
           "name": "_load_server_config",
           "docstring": "",
-          "summary": "該函數的目的是加載伺服器配置文件，從config.json文件中讀取配置信息並返回為字典類型。"
+          "summary": "該函數的目的是加載伺服器配置文件，從config.json文件中讀取配置信息並返回為字典類型的數據。"
         },
         {
           "name": "_ok",
           "docstring": "",
-          "summary": "這個函數返回一個包含成功訊息和數據的字典。"
+          "summary": "這個函數名為_ok，返回一個包含成功訊息和數據的字典。"
         },
         {
           "name": "_err_to_http",
           "docstring": "",
-          "summary": "這個函數將錯誤轉換為HTTP例外，並返回500狀態碼，包含錯誤訊息和追蹤資訊。"
+          "summary": "這個函數的目的是將錯誤轉換為HTTP例外，並返回500狀態碼以及錯誤訊息和追蹤信息。"
+        },
+        {
+          "name": "_serialize_runs",
+          "docstring": "",
+          "summary": "這個函數的目的是將 EquationTextRun 物件序列化為字典的列表。"
         },
         {
           "name": "root",
           "docstring": "",
-          "summary": "該函數返回一個包含服務名稱和版本號的字典。"
+          "summary": "該函數返回包含服務名稱和版本號的字典。"
         },
         {
           "name": "health",
           "docstring": "",
-          "summary": "該函數返回一個包含健康狀態的字典。"
+          "summary": "該函數返回一個表示健康狀態的JSON對象。"
         },
         {
           "name": "create_new_ppt",
           "docstring": "",
-          "summary": "創建新的PPT文件，根據請求中的參數設置文件屬性，並返回成功建立的PPT文件路徑、相關信息和幻燈片清單。"
+          "summary": "創建新的PPT文件，根據請求中的參數設置文件路徑、頁面數量、寬度、高度和DPI，並返回成功建立的PPT文件路徑、相關信息和幻燈片清單。"
         },
         {
           "name": "ppt_info",
           "docstring": "",
-          "summary": "這個函數的目的是從指定的檔案路徑中獲取簡報的資訊，並將其轉換為HTTP回應。"
+          "summary": "這個函數名為ppt_info，用途是從指定的檔案路徑中取得簡報資訊。該函數會嘗試開啟指定路徑的檔案，並回傳相關資訊，若發生錯誤則轉換為HTTP錯誤。"
         },
         {
           "name": "ppt_slides",
           "docstring": "",
-          "summary": "該函數用於從指定文件路徑讀取幻燈片並返回幻燈片清單。"
+          "summary": "該函數用於從指定檔案路徑讀取簡報並返回幻燈片清單。"
+        },
+        {
+          "name": "ppt_textbox_style",
+          "docstring": "",
+          "summary": "此函數用於獲取 PowerPoint 中文字框的樣式資訊，包括文件路徑、幻燈片索引、形狀 ID 和形狀索引等參數。"
+        },
+        {
+          "name": "ppt_slide_textbox_styles",
+          "docstring": "",
+          "summary": "該函數用於獲取指定幻燈片中的文本框樣式。"
+        },
+        {
+          "name": "ppt_set_textbox_style",
+          "docstring": "",
+          "summary": "這個函數的目的是設置演示文稿中文字框的樣式，包括填充顏色、透明度、邊框樣式和顏色等。"
+        },
+        {
+          "name": "ppt_drag_textbox",
+          "docstring": "",
+          "summary": "該函數的目的是在PPT中拖曳文本框，並返回操作結果和相關信息。"
+        },
+        {
+          "name": "ppt_drag_shape",
+          "docstring": "",
+          "summary": "該函數的目的是在幻燈片中拖動形狀，並返回操作結果和相關信息。"
+        },
+        {
+          "name": "ppt_delete_textbox",
+          "docstring": "",
+          "summary": "此函數的目的是刪除演示文稿中的文字框。"
+        },
+        {
+          "name": "ppt_delete_shape",
+          "docstring": "",
+          "summary": "此函數的目的是刪除演示文稿中的形狀，並返回操作結果和相關信息。"
+        },
+        {
+          "name": "ppt_clone_named_shape_from_template",
+          "docstring": "",
+          "summary": "該函數的目的是從模板中複製命名形狀到幻燈片中。"
+        },
+        {
+          "name": "ppt_slide_fonts",
+          "docstring": "",
+          "summary": "此函數用於獲取指定演示文稿中指定幻燈片的字體資訊。"
+        },
+        {
+          "name": "ppt_slides_fonts",
+          "docstring": "",
+          "summary": "此函數用於分析 PowerPoint 檔案中的文字和字型。"
+        },
+        {
+          "name": "ppt_theme_info",
+          "docstring": "讀取簡報佈景主題（theme）相關資訊；底層實作於 dataProcess.ppt_stdio.get_presentation_theme_info。",
+          "summary": "該函數的目的是讀取簡報文件的佈景主題相關資訊，底層實作於 dataProcess.ppt_stdio.get_presentation_theme_info。"
+        },
+        {
+          "name": "ppt_slide_background",
+          "docstring": "讀取單頁投影片背景；底層實作於 get_slide_background_info。",
+          "summary": "該函數的目的是讀取指定投影片的背景，底層實作於 get_slide_background_info。"
+        },
+        {
+          "name": "ppt_slides_backgrounds",
+          "docstring": "掃描整份簡報各頁背景；底層實作於 scan_presentation_backgrounds。",
+          "summary": "該函數的目的是掃描整份簡報各頁的背景，並調用底層函數 scan_presentation_backgrounds 來實現。"
         },
         {
           "name": "ppt_save_as",
           "docstring": "",
-          "summary": "這個函數的目的是接收一個保存請求，將指定的演示文稿另存為指定格式，並返回成功訊息和新檔案路徑。"
+          "summary": "這個函數的目的是將PPT檔案另存為指定格式。該函數接收一個SaveAsRequest對象，打開PPT檔案，進行另存操作，並返回處理後的檔案路徑和相關資訊。"
         },
         {
           "name": "ppt_add_blank_slide",
           "docstring": "",
-          "summary": "這個函數的目的是在PPT中新增一張空白頁。"
+          "summary": "此函數的目的是在PPT中新增一個空白頁。"
         },
         {
           "name": "ppt_add_blank_slides",
           "docstring": "",
-          "summary": "該函數的目的是在PPT中新增多頁空白頁。"
+          "summary": "此函數的目的是在PPT中新增多頁空白頁。"
         },
         {
           "name": "ppt_add_text",
           "docstring": "",
-          "summary": "這個函數的目的是在PPT中新增文字，並返回包含結果信息的字典。"
+          "summary": "這個函數的目的是在PPT幻燈片中新增文字，並返回操作結果和相關信息。"
+        },
+        {
+          "name": "ppt_add_wordart_like_textbox",
+          "docstring": "",
+          "summary": "這個函數的目的是在PPT中新增類似WordArt的文字框。它接受一個AddWordartLikeTextboxRequest對象作為參數，然後在指定的幻燈片上添加相應的文字框。"
+        },
+        {
+          "name": "ppt_update_wordart_text",
+          "docstring": "",
+          "summary": "該函數的目的是更新演示文稿中 WordArt 文字的內容。該函數打開指定的演示文稿文件，更新指定幻燈片上的 WordArt 文字，並保存更新後的文件。"
         },
         {
           "name": "ppt_add_image",
           "docstring": "",
-          "summary": "該函數的目的是將圖片新增至簡報中，並返回新增後的簡報路徑和相關信息。"
+          "summary": "該函數的目的是在幻燈片中新增圖片，並返回操作結果和相關信息。"
         },
         {
           "name": "ppt_add_table",
           "docstring": "",
-          "summary": "該函數的目的是在幻燈片中新增一個表格，並返回處理結果和相關信息。"
+          "summary": "該函數的目的是在PPT中新增一個表格，並返回操作結果和相關信息。"
         },
         {
           "name": "ppt_add_shape",
           "docstring": "",
-          "summary": "此函數的目的是在幻燈片中新增形狀，並返回新增形狀的結果和相關信息。"
+          "summary": "該函數的目的是在幻燈片中新增形狀，並返回新增形狀的結果和相關信息。"
         },
         {
           "name": "ppt_add_line",
           "docstring": "",
-          "summary": "該函數的目的是在幻燈片中新增一條線段，並返回操作結果和相關信息。"
+          "summary": "該函數的目的是向幻燈片中新增一條線段，並返回操作結果和相關信息。"
         },
         {
           "name": "ppt_add_arrow",
           "docstring": "",
-          "summary": "該函數的目的是向演示文稿中新增箭頭，並返回新增箭頭的結果和相關信息。"
+          "summary": "該函數的目的是在幻燈片中新增箭頭，並返回新增箭頭的結果和相關信息。"
         },
         {
           "name": "ppt_delete_slide",
@@ -110,32 +194,32 @@
         {
           "name": "ppt_duplicate_slide",
           "docstring": "",
-          "summary": "此函數的目的是複製幻燈片，並返回相關資訊，包括複製後的幻燈片清單。"
+          "summary": "此函數的目的是複製幻燈片並返回相關資訊。"
         },
         {
           "name": "ppt_replace_text",
           "docstring": "",
-          "summary": "該函數的目的是替換 PowerPoint 文件中的文本。"
+          "summary": "該函數的目的是替換 PowerPoint 檔案中的文字，並返回處理結果和相關信息。"
         },
         {
           "name": "ppt_add_bullets",
           "docstring": "",
-          "summary": "該函數的目的是向幻燈片中添加項目符號，並返回處理結果和相關信息。"
+          "summary": "此函數的目的是將項目符號新增至簡報中的指定幻燈片。"
         },
         {
           "name": "ppt_add_title_slide",
           "docstring": "",
-          "summary": "該函數的目的是在PPT中新增一個標題頁。"
+          "summary": "該函數的目的是在PPT中新增一個標題頁，並返回相關信息和幻燈片清單。"
         },
         {
           "name": "ppt_reorder_slides",
           "docstring": "",
-          "summary": "這個函數的目的是重新排列幻燈片，並返回處理後的幻燈片檔案路徑和相關資訊。"
+          "summary": "這個函數的目的是重新排列幻燈片，並返回處理結果和相關信息。"
         },
         {
           "name": "ppt_set_slides_background_color",
           "docstring": "",
-          "summary": "該函數的目的是設定幻燈片的背景顏色，並返回處理結果和相關信息。"
+          "summary": "該函數的目的是設定多頁幻燈片的背景顏色。"
         },
         {
           "name": "ppt_set_slides_background_image",
@@ -150,17 +234,37 @@
         {
           "name": "ppt_set_slide_background_image",
           "docstring": "",
-          "summary": "該函數的目的是設定幻燈片的背景圖片。"
+          "summary": "該函數的目的是設定幻燈片的背景圖片。在處理請求時，打開幻燈片文件，設定指定幻燈片的背景圖片，保存文件，並返回成功設定背景圖片的訊息。"
         },
         {
           "name": "ppt_render_slide_to_image",
           "docstring": "",
-          "summary": "該函數的目的是將投影片轉換為圖像。"
+          "summary": "該函數的目的是將投影片渲染為圖像。"
         },
         {
           "name": "ppt_render_slides_to_grid_image",
           "docstring": "",
           "summary": "該函數的目的是將幻燈片渲染為網格圖像，並返回成功消息。"
+        },
+        {
+          "name": "ppt_parse_math_expression",
+          "docstring": "解析數學公式：默認使用 OMML 路徑，image 模式保持與 M1 兼容。",
+          "summary": "解析數學公式，使用OMML路徑作為默認，image模式與M1兼容。"
+        },
+        {
+          "name": "ppt_add_equation",
+          "docstring": "Add equation: default OMML path, image mode keeps M1 compatibility.",
+          "summary": "添加方程式：默认OMML路径，图像模式保持M1兼容性。"
+        },
+        {
+          "name": "ppt_update_equation",
+          "docstring": "更新數學公式：默認使用 OMML 路徑，image 模式更新圖像公式。",
+          "summary": "更新數學公式的功能，根據指定的模式（OMML或圖像）更新公式，並返回更新結果。"
+        },
+        {
+          "name": "ppt_delete_equation",
+          "docstring": "刪除數學公式：默認使用 OMML 路徑，image 模式刪除圖像公式。",
+          "summary": "該函數的目的是刪除數學公式，默認使用OMML路徑，並在圖像模式下刪除圖像公式。"
         }
       ]
     },
@@ -170,12 +274,12 @@
         {
           "name": "_ensure_pptx_available",
           "docstring": "",
-          "summary": "確保python-pptx可用，若未安裝則引發ImportError。"
+          "summary": "確保python-pptx可用，如果未安裝則引發ImportError。"
         },
         {
           "name": "_px_to_emu",
           "docstring": "",
-          "summary": "這個函數將像素轉換為EMUs（Enhanced Metafile Units），並根據提供的DPI（每英寸點數）進行轉換。"
+          "summary": "這個函數的目的是將像素轉換為EMUs（EMUs是一種用於表示尺寸的單位），並且可以根據DPI（每英寸點數）來進行轉換。"
         },
         {
           "name": "_normalize_file_path",
@@ -185,12 +289,12 @@
         {
           "name": "_ensure_parent_dir",
           "docstring": "",
-          "summary": "該函數的目的是確保文件的父目錄存在。如果父目錄不存在，則創建父目錄。"
+          "summary": "該函數的目的是確保給定文件路徑的父目錄存在，如果不存在則創建。"
         },
         {
           "name": "_get_blank_layout",
           "docstring": "",
-          "summary": "此函數用於獲取 PowerPoint 簡報中的空白版面，通常是第6個版面。如果模板不同，則返回最後一個版面。"
+          "summary": "此函數用於獲取 PowerPoint 簡報的空白版面，通常為索引 6，若模板不同則返回最後一個版面。"
         },
         {
           "name": "_remove_all_slides",
@@ -200,12 +304,12 @@
         {
           "name": "_validate_slide_index",
           "docstring": "",
-          "summary": "此函數用於驗證幻燈片索引是否在有效範圍內，若超出範圍則拋出IndexError。"
+          "summary": "此函數用於驗證幻燈片索引是否有效，若索引超出範圍則引發IndexError。"
         },
         {
           "name": "_rgb_tuple_to_color",
           "docstring": "",
-          "summary": "這個函數的目的是將 RGB 顏色元組轉換為 RGBColor 物件。如果輸入的 RGB 元組為空或長度不為 3，則會拋出 ValueError 錯誤。"
+          "summary": "這個函數的目的是將 RGB 元組轉換為 RGB 顏色對象。如果輸入的 RGB 元組為空或長度不為 3，則會拋出 ValueError 錯誤。"
         },
         {
           "name": "_load_pptstudio_config",
@@ -215,37 +319,77 @@
         {
           "name": "_contains_cjk",
           "docstring": "",
-          "summary": "此函數用於檢查文本中是否包含中日韓字符。"
+          "summary": "此函數檢查文本中是否包含中日韓字符。"
         },
         {
           "name": "_get_default_fonts",
           "docstring": "",
-          "summary": "此函數用於獲取預設字體。返回一個包含中文和英文預設字體的元組。"
+          "summary": "此函數用於獲取預設的中文和英文字體。"
         },
         {
           "name": "_looks_like_font_path",
           "docstring": "",
-          "summary": "該函數用於檢查輸入是否看起來像是字型檔案的路徑。"
+          "summary": "該函數用於檢查輸入值是否看起來像是字型檔案的路徑。"
         },
         {
           "name": "_resolve_font_name",
           "docstring": "",
-          "summary": "這個函數的目的是解析字型名稱，如果提供的字型名稱是有效的字型檔案路徑，則返回該字型檔案的家族名稱；如果提供的字型名稱不是有效的字型檔案路徑，則返回字型名稱本身。"
+          "summary": "這個函數的目的是解析字型名稱，並返回字型的家族名稱。如果字型名稱為空或不是有效的字型路徑，則返回None。如果成功解析字型並找到字型檔案，則返回字型的家族名稱。"
+        },
+        {
+          "name": "_activate_matplotlib_chinese_font",
+          "docstring": "設定 matplotlib 可用的中文字型，避免截圖標題顯示為方塊。",
+          "summary": "設定 matplotlib 可用的中文字型，避免截圖標題顯示為方塊。"
+        },
+        {
+          "name": "_rgb_from_color",
+          "docstring": "",
+          "summary": "這個函數的目的是從顏色對象中提取RGB值，並以列表形式返回。如果無法提取，則返回None。"
+        },
+        {
+          "name": "_clamp_transparency",
+          "docstring": "",
+          "summary": "這個函數的目的是將輸入值限制在0到1之間，若超出範圍則返回最接近的邊界值。"
+        },
+        {
+          "name": "_find_fill_color_node",
+          "docstring": "",
+          "summary": "該函數的目的是在給定形狀中查找填充顏色節點。"
+        },
+        {
+          "name": "_read_fill_transparency_from_xml",
+          "docstring": "",
+          "summary": "此函數的目的是從 XML 中讀取形狀的填充透明度。"
+        },
+        {
+          "name": "_write_fill_transparency_to_xml",
+          "docstring": "",
+          "summary": "此函數的目的是將填充透明度寫入XML文件中，以設定形狀的填充透明度。"
+        },
+        {
+          "name": "_dash_style_to_name",
+          "docstring": "",
+          "summary": "這個函數的目的是將虛線樣式轉換為對應的名稱。如果虛線樣式為空，則返回\"solid\"；否則返回虛線樣式的名稱或轉換為小寫後的字符串。"
+        },
+        {
+          "name": "_name_to_dash_style",
+          "docstring": "",
+          "summary": "此函數的目的是將線樣式名稱轉換為對應的枚舉值，如果輸入的線樣式名稱不在指定的候選列表中，則會拋出 ValueError 錯誤。"
         },
         {
           "name": "__init__",
           "docstring": "",
-          "summary": "這個函數是用來初始化一個PPTDocument物件，設定其簡報物件和檔案路徑。"
+          "summary": "這個函數是用來初始化一個PPTDocument物件，將傳入的Presentation物件和檔案路徑設定為物件的屬性。"
         },
         {
           "name": "slide_count",
           "docstring": "",
-          "summary": "這個函數的目的是返回 PPT 文件中幻燈片的數量。該函數通過計算 self.prs.slides 的長度來實現。"
+          "summary": "這個函數的目的是返回PPT文檔中幻燈片的數量。"
         },
         {
           "name": "save",
           "docstring": "",
-          "summary": "這個函數的目的是將 PPT 文件儲存到指定的檔案路徑，如果未提供檔案路徑則會拋出 ValueError 錯誤。"
+          "summary": "這個函數的目的是將 PPT 文件儲存到指定的檔案路徑，如果未提供檔案路徑則會引發 ValueError。"
         },
         {
           "name": "add_blank_slide",
@@ -255,37 +399,37 @@
         {
           "name": "add_blank_slides",
           "docstring": "",
-          "summary": "該函數用於在PPT文檔中添加空白幻燈片，可以指定添加的幻燈片數量。"
+          "summary": "該函數用於在PPT文檔中添加空白幻燈片，可以指定添加的數量。如果指定的幻燈片數量小於1，則會拋出ValueError異常。"
         },
         {
           "name": "add_textbox",
           "docstring": "",
-          "summary": "這個函數的目的是在指定投影片上新增一個文字框，可以設定文字內容、位置、大小、字型等屬性。"
+          "summary": "該函數的目的是在幻燈片上添加文本框，可以設置文本內容、位置、大小、字體等屬性。"
         },
         {
           "name": "add_image",
           "docstring": "",
-          "summary": "該函數的目的是在幻燈片中添加圖片，並可以控制圖片的位置、大小和保持長寬比。"
+          "summary": "該函數的目的是在指定的投影片中添加圖片，可以設定圖片的位置、大小和是否保持長寬比。如果圖片路徑無效或找不到圖片，將引發相應的錯誤。"
         },
         {
           "name": "add_table",
           "docstring": "",
-          "summary": "該函數的目的是在指定的投影片上添加一個表格，可以設置表格的行數、列數、位置、大小和內容。如果指定了表格的內容，則可以將數據填充到表格中，並可以選擇將首行作為標題。"
+          "summary": "此函數用於在指定投影片中添加表格，可以指定表格的行數、列數、位置和大小等參數，並可選擇是否將第一行作為表頭。"
         },
         {
           "name": "add_shape",
           "docstring": "",
-          "summary": "此函數用於在指定投影片上新增形狀，可以設定形狀的類型、位置、大小、填充顏色、邊框顏色等屬性。"
+          "summary": "該函數的目的是在指定的投影片中添加形狀，可以設定形狀的類型、位置、大小、文本內容以及填充和邊框顏色等屬性。"
         },
         {
           "name": "add_line",
           "docstring": "",
-          "summary": "此函數用於在指定投影片上新增一條直線，可以設定線的顏色和寬度。"
+          "summary": "該函數的目的是在PPT文檔的指定幻燈片上添加一條直線，可以指定起點、終點、線條顏色和寬度。"
         },
         {
           "name": "add_arrow",
           "docstring": "",
-          "summary": "該函數的目的是在幻燈片上添加箭頭形狀，可以指定箭頭的方向、文本、填充顏色等屬性。"
+          "summary": "該函數的目的是在幻燈片上添加箭頭形狀，可以指定箭頭的方向、位置、大小和其他樣式屬性。"
         },
         {
           "name": "set_slide_background_color",
@@ -300,47 +444,112 @@
         {
           "name": "set_slides_background_color",
           "docstring": "",
-          "summary": "設定指定投影片的背景顏色。接受投影片索引和RGB顏色作為輸入，並返回包含結果的字典列表。"
+          "summary": "設置幻燈片背景顏色的函數，接受幻燈片索引和RGB顏色值，並返回一個包含結果的字典列表。"
         },
         {
           "name": "set_slides_background_image",
           "docstring": "",
-          "summary": "設置幻燈片背景圖像的功能。接受幻燈片索引和圖像路徑，將圖像設置為指定幻燈片的背景。返回一個包含設置結果的字典列表。"
+          "summary": "該函數用於設置幻燈片的背景圖像。接受幻燈片索引和圖像路徑，並返回一個包含結果的字典列表。"
         },
         {
           "name": "get_info",
           "docstring": "",
-          "summary": "該函數返回包含PPT文件信息的字典，包括文件路径、幻灯片数量、幻灯片尺寸和布局数量。"
+          "summary": "該函數用於獲取PPT文件的相關信息，包括文件路徑、幻燈片數量、幻燈片寬度、幻燈片高度和版面數量。"
         },
         {
           "name": "list_slides",
           "docstring": "",
-          "summary": "此函數用於列出幻燈片中的形狀資訊，包括形狀ID、名稱、類型和文字內容預覽。"
+          "summary": "此函數的目的是列出幻燈片中的形狀資訊，包括形狀編號、名稱、類型和文字內容預覽。"
+        },
+        {
+          "name": "_get_textbox_shape",
+          "docstring": "",
+          "summary": "此函數用於從指定投影片中獲取文本框形狀，可以通過形狀ID或形狀索引來查找。如果未提供形狀ID或形狀索引，將引發錯誤。"
+        },
+        {
+          "name": "get_textbox_style",
+          "docstring": "",
+          "summary": "該函數的目的是獲取幻燈片中文本框的樣式信息，包括填充和邊框相關信息。"
+        },
+        {
+          "name": "get_slide_textbox_styles",
+          "docstring": "",
+          "summary": "該函數的目的是獲取幻燈片中文本框的樣式信息，包括文本框數量、形狀數量和每個文本框的樣式。"
+        },
+        {
+          "name": "set_textbox_style",
+          "docstring": "",
+          "summary": "這個函數的目的是設置幻燈片中文字框的樣式，包括填充顏色、填充透明度、邊框樣式、邊框顏色和邊框寬度。如果填充透明度不在0.0到1.0之間，將引發值錯誤。如果邊框寬度小於0，也會引發值錯誤。"
+        },
+        {
+          "name": "drag_shape",
+          "docstring": "",
+          "summary": "這個函數的目的是拖動幻燈片中的形狀，可以指定形狀的位置和尺寸。如果指定寬度或高度小於等於零，將引發值錯誤。"
+        },
+        {
+          "name": "drag_textbox",
+          "docstring": "",
+          "summary": "這個函數的目的是拖動幻燈片中的文字框。"
+        },
+        {
+          "name": "delete_textbox",
+          "docstring": "",
+          "summary": "該函數的目的是刪除幻燈片中的文字框，並返回相關信息，如刪除的文字框索引、ID、名稱和預覽文本。"
+        },
+        {
+          "name": "get_slide_text_fonts",
+          "docstring": "讀取指定頁文字來源（文字框與表格 cell）內各 run 的字型資訊。",
+          "summary": "該函數的目的是讀取指定頁面的文字來源（文字框與表格 cell）內各 run 的字型資訊。"
+        },
+        {
+          "name": "scan_presentation_text_fonts",
+          "docstring": "掃描整份簡報每一頁的文字字型資訊。",
+          "summary": "這個函數的目的是掃描整份簡報每一頁的文字字型資訊。"
+        },
+        {
+          "name": "_get_shape",
+          "docstring": "",
+          "summary": "此函數用於從指定投影片中獲取形狀，需要提供投影片索引和形狀ID或形狀索引。如果未提供形狀ID或形狀索引，將引發值錯誤。如果提供了形狀ID，將在投影片中查找並返回相應形狀。如果提供了形狀索引，將檢查範圍並返回對應形狀。"
+        },
+        {
+          "name": "get_shape_style",
+          "docstring": "",
+          "summary": "獲取PPT文件中指定幻燈片的形狀樣式，包括填充和線條信息。"
+        },
+        {
+          "name": "set_shape_style",
+          "docstring": "",
+          "summary": "此函數用於設置幻燈片中形狀的樣式，包括填充顏色、填充透明度、線條樣式、線條顏色和線條寬度。"
+        },
+        {
+          "name": "set_shape_fill_transparency",
+          "docstring": "",
+          "summary": "設置形狀填充透明度的功能，可以設置幻燈片中形狀的填充透明度和填充顏色。"
         },
         {
           "name": "delete_slide",
           "docstring": "",
-          "summary": "此函數用於刪除幻燈片，接受幻燈片索引作為參數，並返回刪除後的結果。"
+          "summary": "此函數的目的是刪除幻燈片。它接受幻燈片索引作為參數，從幻燈片列表中刪除指定索引的幻燈片，並返回刪除後的幻燈片索引和剩餘幻燈片數量。"
         },
         {
           "name": "duplicate_slide",
           "docstring": "",
-          "summary": "該函數的目的是複製幻燈片，包括形狀和背景，並返回相關信息，如原始幻燈片索引、新幻燈片索引和總幻燈片數。"
+          "summary": "該函數的目的是複製幻燈片，包括形狀和背景。"
         },
         {
           "name": "replace_text",
           "docstring": "",
-          "summary": "此函數的目的是在PPT文件中替換文本。根據提供的參數，將指定的文本替換為新文本，可以選擇是否區分大小寫和精確匹配。"
+          "summary": "此函數的目的是在 PowerPoint 文件中替換文本。接受要替換的舊文本和新文本，並可選擇在特定幻燈片上進行替換，支持精確匹配和大小寫敏感性設置。"
         },
         {
           "name": "add_bullets",
           "docstring": "",
-          "summary": "該函數用於在指定投影片中添加項目符號清單，可以設定位置、大小、字體等屬性。"
+          "summary": "該函數用於在指定投影片中添加項目符號清單，可以設定位置、大小、字體等參數。"
         },
         {
           "name": "add_title_slide",
           "docstring": "",
-          "summary": "此函數的目的是在PPT文件中添加標題幻燈片，可以包含標題和副標題。該函數會尋找合適的佈局並添加標題和副標題到幻燈片中。"
+          "summary": "此函數的目的是在PPT文件中添加標題幻燈片，可以包括標題和副標題。該函數會嘗試找到適合的幻燈片佈局，並將標題和副標題添加到幻燈片中。"
         },
         {
           "name": "reorder_slides",
@@ -350,67 +559,202 @@
         {
           "name": "new",
           "docstring": "建立新的 pptx 檔案\n\nArgs:\n    file_path: 輸出檔案路徑\n    plank_page_num: 頁面數量\n    plank_page_width: 頁面寬度（px）\n    plank_page_height: 頁面高度（px）\n    dpi: 像素轉尺寸時使用的 DPI\n\nReturns:\n    str: 建立後的檔案路徑",
-          "summary": "建立新的 pptx 檔案，並返回建立後的檔案路徑。接受輸出檔案路徑、頁面數量、頁面寬度、頁面高度和 DPI 作為參數。"
+          "summary": "建立新的 pptx 檔案，可指定頁面數量、寬度、高度和 DPI。返回建立後的檔案路徑。"
         },
         {
           "name": "new_document",
           "docstring": "",
-          "summary": "新建一個 PowerPoint 文件，可以指定頁面數量、寬度和高度。"
+          "summary": "新建一個 PowerPoint 文件，可以指定頁面數量、寬度和高度。如果輸入的參數不符合要求，則會拋出相應的錯誤。"
         },
         {
           "name": "open_presentation",
           "docstring": "",
-          "summary": "此函數用於打開 PowerPoint 檔案並返回 PPTDocument 物件。如果檔案不存在，則會拋出 FileNotFoundError 錯誤。"
+          "summary": "此函數用於打開 PowerPoint 簡報檔案，檢查檔案是否存在並返回 PPTDocument 物件。"
         },
         {
           "name": "save",
           "docstring": "",
-          "summary": "這個函數的目的是保存PPT文件到指定路徑。"
+          "summary": "這個函數的目的是保存PPT文件到指定的文件路徑。"
         },
         {
           "name": "add_blank_slide",
           "docstring": "",
-          "summary": "這個函數在PPT文件中新增一個空白投影片。"
+          "summary": "此函數在PPT文件中添加一張空白幻燈片。"
         },
         {
           "name": "add_blank_slides",
           "docstring": "",
-          "summary": "該函數用於在PPT文件中添加空白幻燈片。"
+          "summary": "該函數用於在指定的PPT文件中添加空白幻燈片。"
         },
         {
           "name": "add_text",
           "docstring": "",
-          "summary": "這個函數的目的是在指定的 PPT 文件的特定幻燈片上添加文本框，可以設定文本的內容、位置、大小、字體等屬性。"
+          "summary": "該函數用於在指定幻燈片上添加文本框，可以設定文本的內容、位置、大小、字體等屬性。"
+        },
+        {
+          "name": "add_wordart_like_textbox",
+          "docstring": "以一般文字框模擬 WordArt 風格（大字、描邊／底色等由後續參數擴充）。\n\n實作提示：\n- 底層可呼叫既有 add_text / add_textbox 邏輯並加強字型與外框\n- 非 PowerPoint 原生 WordArt 物件；複雜特效需改 OOXML 或改走 clone_named_shape_from_template",
+          "summary": "該函數的目的是以一般文字框模擬 WordArt 風格，可以設定字型、大小、粗體、對齊等參數。"
+        },
+        {
+          "name": "update_wordart_text",
+          "docstring": "更新現有「類 WordArt」或範本複製 shape 的文字；優先只改 run.text 以保留特效。\n\n實作提示：\n- 依 shape_name 或 shape_id / shape_index 解析目標 shape（與 delete_textbox 解析策略對齊）\n- 僅在 has_text_frame 時更新；否則 notes 說明並不中斷其他欄位處理（若有多段）",
+          "summary": "更新現有「類 WordArt」或範本複製 shape 的文字；優先只改 run.text 以保留特效。"
+        },
+        {
+          "name": "delete_shape",
+          "docstring": "刪除投影片上任意一個 shape（含以圖片／群組偽裝者）；本質為從 XML parent 移除元素。\n\n實作提示：\n- 可參考 issues：`el = shape._element; parent.remove(el)`\n- 與 delete_textbox 差異：不限定文字方塊；需處理找不到 shape 的錯誤訊息",
+          "summary": "該函數的目的是刪除投影片上的任意一個 shape（包括圖片或群組），實際上是從 XML parent 中移除元素。需要處理找不到 shape 的錯誤訊息，並且不限定於文字方塊。"
+        },
+        {
+          "name": "clone_named_shape_from_template",
+          "docstring": "從指定頁依 shape.name 找到範本 shape，複製到同頁（或指定位置），並可選填新文字。\n\nissues 原簽名以 slide 為單位；此處改為 document + slide_index 以符合 ppt_stdio 慣例。\n\n實作提示：\n- 複製可 deepcopy(shape._element) 後插入 spTree，並處理 rId / 媒體關聯\n- 若範本在「另一份簡報」，可另增參數 template_path（此處先以註解預留擴充點）",
+          "summary": "該函數的目的是從指定頁面中根據形狀名稱找到範本形狀，將其複製到同一頁面或指定位置，並可選擇填入新文字。实现提示包括深度复制形状元素并处理相关联的媒体，以及可能支持跨演示文稿模板复制的扩展点。"
+        },
+        {
+          "name": "_equation_shape_name",
+          "docstring": "",
+          "summary": "這個函數的目的是根據給定的表達式ID，返回相應的方程式名稱。"
+        },
+        {
+          "name": "_extract_expr_id_from_shape",
+          "docstring": "",
+          "summary": "這個函數的目的是從形狀中提取表達式ID。如果形狀名稱以指定前綴開頭，則提取後面的值作為表達式ID返回，否則返回None。"
+        },
+        {
+          "name": "_equation_image_dir",
+          "docstring": "",
+          "summary": "該函數的目的是返回方程式圖像的目錄路徑。如果提供了文件路徑，則在該路徑下創建一個名為\"_ppt_equations\"的目錄；否則，在臨時目錄中創建該目錄。"
+        },
+        {
+          "name": "_validate_rgb_tuple",
+          "docstring": "",
+          "summary": "此函數的目的是驗證 RGB 顏色元組是否有效，確保每個值介於 0 到 255 之間。如果顏色為 None 或長度不為 3，則會拋出 ValueError 錯誤。"
+        },
+        {
+          "name": "_strip_math_delimiters",
+          "docstring": "",
+          "summary": "此函數的目的是從輸入文本中去除數學公式的包裝符號，並返回處理後的文本和相關註釋。"
+        },
+        {
+          "name": "_check_brace_balance",
+          "docstring": "",
+          "summary": "檢查文本中的大括號是否平衡，若不平衡則引發 ValueError。"
+        },
+        {
+          "name": "_render_latex_to_png",
+          "docstring": "",
+          "summary": "這個函數的目的是將正規化的 LaTeX 公式渲染為 PNG 圖像，並保存到指定路徑。可以指定字體大小和顏色。"
+        },
+        {
+          "name": "_find_equation_shape",
+          "docstring": "",
+          "summary": "此函數的目的是在PPT文件中查找方程形狀。根據提供的表達式ID或形狀ID，以及幻燈片索引，返回相應的形狀信息。"
+        },
+        {
+          "name": "parse_spoken_math_to_latex",
+          "docstring": "將口語描述轉成標準 LaTeX 字串（或結構化片段）。\n\n預期回傳鍵（實作時補齊）：latex 或 normalized_latex、parse_confidence、notes",
+          "summary": "該函數的目的是將口語描述轉換為標準的 LaTeX 字串或結構化片段。"
+        },
+        {
+          "name": "normalize_latex",
+          "docstring": "清洗與檢查 LaTeX；供 image / 未來 omml 共用。\n\n預期回傳鍵：normalized_latex、notes；語法問題時 parse_confidence 降低或錯誤訊息寫入 notes",
+          "summary": "這個函數的目的是清洗和檢查 LaTeX 代碼，以供圖像或未來 omml 使用。它會返回經過清理的 LaTeX 代碼和相關註釋。當遇到語法問題時，會降低解析信心或將錯誤訊息寫入註釋。"
+        },
+        {
+          "name": "parse_math_expression",
+          "docstring": "可選單一入口：依 input_type 走口語轉換或只做 normalize。\n\ninput_type: spoken | latex（大小寫統一在實作內處理）\n預期回傳：normalized_latex、parse_confidence、notes（對齊 POST /ppt/parse_math_expression）",
+          "summary": "該函數根據輸入的input_type進行口語轉換或規範化處理，並返回包含規範化後的LaTeX表示、解析信心度和註釋的字典。"
+        },
+        {
+          "name": "add_equation",
+          "docstring": "M1：將式子渲染成圖片後插入指定頁（render_mode=image）。\n\n預期回傳：expr_id, shape_id, slide_index, render_mode, normalized_latex, image_path,\nbbox, notes（對齊 issues M1 出參）",
+          "summary": "將式子渲染成圖片後插入指定頁面，並返回相關資訊，如表達式ID、形狀ID、頁面索引等。"
+        },
+        {
+          "name": "update_equation",
+          "docstring": "依 expr_id 或 shape_id 找到既有方程式圖片，重新解析並置換圖片或更新關聯檔。\n\n預期回傳：expr_id, shape_id, updated, normalized_latex, image_path, notes",
+          "summary": "根据 expr_id 或 shape_id 查找现有的方程式图片，重新解析并替换图片或更新相关文件。函数预期返回包含 expr_id、shape_id、updated、normalized_latex、image_path 和 notes 的字典。"
+        },
+        {
+          "name": "delete_equation",
+          "docstring": "刪除方程式對應的圖片 shape（與 expr_id 對應之中繼資料若有的話一併清理）。\n\n預期回傳：deleted, expr_id, shape_id, notes",
+          "summary": "該函數的目的是刪除與方程式相關的圖片形狀，同時清理相應的中繼資料。預期返回的結果包括已刪除標誌、方程式ID、形狀ID和備註。"
+        },
+        {
+          "name": "_latex_to_omml_ooxml",
+          "docstring": "將已正規化的 LaTeX 轉成 Office Math ML（OMML）對應的 oxml 片段或位元組。\n\n實作提示：\n- 可評估：MathML 中繼、第三方 LaTeX->OMML、pandoc、或僅支援子集合手刻 m:oMath\n- 回傳型別可為 lxml Element 或 pptx 相容的 OxmlElement 樹，由 _insert_omml_math_block 承接",
+          "summary": "將已正規化的 LaTeX 轉換為 Office Math ML（OMML）對應的 oxml 片段或位元組。实现提示包括使用 MathML 中繼、第三方 LaTeX->OMML、pandoc 或手动编写 m:oMath 子集。返回类型可以是 lxml Element 或 pptx 兼容的 OxmlElement 樹。"
+        },
+        {
+          "name": "_ensure_omml_o_math_element",
+          "docstring": "",
+          "summary": "該函數確保提供的OMML元素是m:oMath或m:oMathPara。如果元素是oMath，則返回該元素。如果元素是oMathPara，則返回其內的oMath元素。"
+        },
+        {
+          "name": "_normalize_text_runs",
+          "docstring": "",
+          "summary": "此函數的目的是將文本運行標準化為字典列表，包括文本內容、字體名稱、字體大小、粗體、斜體和字體顏色。"
+        },
+        {
+          "name": "_append_a_text_run",
+          "docstring": "",
+          "summary": "此函數的目的是將文本運行附加到段落中，設置字體大小、粗體、斜體、字體名稱和字體顏色。"
+        },
+        {
+          "name": "_write_omml_to_shape",
+          "docstring": "",
+          "summary": "此函數的目的是將 OMML 元素寫入形狀中，需要依賴 lxml 庫。"
+        },
+        {
+          "name": "_insert_omml_math_block",
+          "docstring": "在指定頁建立可編輯方程式容器，並把 OMML 片段掛進 shape 的 txBody / body 結構。\n\n實作提示：\n- 可能需新增圖形文字方塊後，於 a:p / a:r 內插入 a:oMathPara\n- expr_id 建議寫入 shape.name（沿用 _equation_shape_name）供 update/delete 尋址",
+          "summary": "該函數的目的是在指定的幻燈片上創建可編輯的數學方程式容器，並將OMML片段插入到形狀的txBody/body結構中。"
+        },
+        {
+          "name": "add_equation_omml",
+          "docstring": "B 方案：在指定頁插入可編輯的 OMML 方程式（render_mode=omml）。\n\n預期回傳（對齊統一模型）：expr_id, shape_id, slide_index, render_mode:omml,\nnormalized_latex, omml_fragment_ref 或內嵌摘要、bbox、notes；image_path 可為 None。\nfont_size / color 可對應 w:rPr / m:rFonts（實作時再對應）。",
+          "summary": "該函數的目的是在指定頁面插入可編輯的 OMML 方程式（render_mode=omml），並返回相關資訊，如表達式 ID、形狀 ID、頁面索引等。"
+        },
+        {
+          "name": "update_equation_omml",
+          "docstring": "B 方案：更新既有 OMML 方程式內容，盡量維持版面與 shape 不漂移。\n\n實作提示：\n- 以 _find_equation_shape 或另建 _find_omml_equation_shape 定位 a:oMath 節點\n- 置換 m:oMath 子樹或更新 Office Math 區塊，避免整顆 shape 刪除重建",
+          "summary": "更新既有 OMML 方程式內容，盡量維持版面與 shape 不漂移。"
+        },
+        {
+          "name": "delete_equation_omml",
+          "docstring": "B 方案：刪除 OMML 方程式對應 shape（或僅清空 oMath 區塊，依產品策略決定）。\n\n實作提示：\n- 若整顆 shape 皆為方程式容器，可直接 delete_shape；若混合文字則只移除 oMath 節點",
+          "summary": "該函數的目的是根據提供的參數刪除 PowerPoint 文件中的 OMML 方程式對應的形狀，或清空 oMath 區塊，具體操作取決於產品策略。"
         },
         {
           "name": "add_image",
           "docstring": "",
-          "summary": "此函數用於在指定投影片中添加圖像。接受文件、投影片索引、圖像路徑、位置和大小等參數，並返回包含操作結果的字典。"
+          "summary": "此函數用於在指定投影片中添加圖片至 PPT 文件中。接受文件、投影片索引、圖片路徑、位置和大小等參數，並返回包含操作結果的字典。"
         },
         {
           "name": "add_table",
           "docstring": "",
-          "summary": "該函數用於在指定的 PPT 文檔中的指定幻燈片上添加一個表格，可以指定表格的行數、列數、位置、大小和數據。"
+          "summary": "該函數的目的是在指定的 PPT 文件中的指定幻燈片上添加一個表格，可以設置表格的行數、列數、位置、寬度、高度、數據等參數。"
         },
         {
           "name": "add_shape",
           "docstring": "",
-          "summary": "該函數用於在指定的投影片中添加形狀到文件中。接受多個參數，包括形狀類型、位置、大小、文本內容和樣式設置。"
+          "summary": "此函數用於在指定投影片上新增形狀到文件中。"
         },
         {
           "name": "add_line",
           "docstring": "",
-          "summary": "該函數用於在指定投影片上添加一條線條，可以指定線條的起點、終點、顏色和寬度。"
+          "summary": "此函數在PPT文件中的指定幻燈片上添加一條直線。接受幻燈片索引、起點座標、終點座標、線條顏色和寬度等參數。"
         },
         {
           "name": "add_arrow",
           "docstring": "",
-          "summary": "該函數用於在幻燈片上添加箭頭形狀，可以指定箭頭的位置、大小、方向和文本等屬性。"
+          "summary": "該函數用於在幻燈片上添加箭頭形狀，可以指定箭頭的方向、文本、填充顏色等屬性。"
         },
         {
           "name": "get_info",
           "docstring": "",
-          "summary": "該函數的目的是從PPT文件中獲取信息並返回一個包含該信息的字典。"
+          "summary": "該函數的目的是從PPT文件中獲取信息並返回作為字典。"
         },
         {
           "name": "list_slides",
@@ -418,19 +762,109 @@
           "summary": "該函數的目的是列出給定演示文稿中的所有幻燈片。"
         },
         {
+          "name": "get_textbox_style",
+          "docstring": "",
+          "summary": "該函數用於獲取幻燈片中文本框的樣式。"
+        },
+        {
+          "name": "get_slide_textbox_styles",
+          "docstring": "",
+          "summary": "該函數用於獲取指定幻燈片的文本框樣式。"
+        },
+        {
+          "name": "set_textbox_style",
+          "docstring": "",
+          "summary": "設置幻燈片中文本框的樣式，可以指定填充顏色、透明度、邊框樣式、邊框顏色和寬度。"
+        },
+        {
+          "name": "drag_shape",
+          "docstring": "",
+          "summary": "該函數用於拖動幻燈片中的形狀，可以指定幻燈片索引、形狀ID、位置、大小等參數。"
+        },
+        {
+          "name": "drag_textbox",
+          "docstring": "",
+          "summary": "該函數用於拖動 PowerPoint 文件中的文本框，可以指定文檔、幻燈片索引和文本框的位置和尺寸等參數。"
+        },
+        {
+          "name": "delete_textbox",
+          "docstring": "",
+          "summary": "該函數用於刪除 PowerPoint 文件中的文本框。接受文件、幻燈片索引、形狀ID和形狀索引作為參數，並返回一個包含操作結果的字典。"
+        },
+        {
+          "name": "get_slide_text_fonts",
+          "docstring": "",
+          "summary": "這個函數的目的是從指定的 PPT 文件和幻燈片中獲取文字字型的資訊。"
+        },
+        {
+          "name": "scan_presentation_text_fonts",
+          "docstring": "",
+          "summary": "該函數的目的是掃描演示文稿中的文本字體。"
+        },
+        {
           "name": "set_slide_background_color",
           "docstring": "",
-          "summary": "這個函數的目的是設置幻燈片的背景顏色。接受一個 PPT 文件、幻燈片索引和 RGB 顏色值，並將背景顏色設置為指定的 RGB 值。"
+          "summary": "該函數用於設置幻燈片的背景顏色。接受幻燈片文檔、幻燈片索引和RGB顏色作為輸入，並返回一個字典。"
         },
         {
           "name": "set_slide_background_image",
           "docstring": "",
-          "summary": "設置幻燈片背景圖像。接收演示文稿、幻燈片索引和圖像路徑，將圖像設置為指定幻燈片的背景。"
+          "summary": "設置幻燈片背景圖像的功能。接受演示文稿、幻燈片索引和圖像路徑作為參數，並將圖像設置為指定幻燈片的背景。"
+        },
+        {
+          "name": "_get_theme_part_info",
+          "docstring": "從 python-pptx 的 package / relationship 找出 theme 相關 part 路徑與基本資訊。\n\n實作提示：\n- 可從 document.prs.part.package、slide master rels、presentation rels 尋找 theme 關聯\n- 關鍵欄位至少覆蓋：has_theme、theme_part_name、slide_master_count、notes\n- theme_part_name 格式期望類似：/ppt/theme/theme1.xml\n- 若某關聯失敗或不存在，改寫入 notes，不直接中斷整體流程",
+          "summary": "這個函數的目的是從 python-pptx 的 package / relationship 中找出主題相關部分的路徑和基本資訊。該函數尋找主題相關的部分，並檢索關鍵資訊，如主題部分的名稱和幻燈片母片數量。"
+        },
+        {
+          "name": "_parse_theme_xml",
+          "docstring": "解析 theme XML（a:theme / clrScheme / fontScheme 等），抽出 color_scheme、font_scheme。\n\n實作提示：\n- 使用 ElementTree 與 OOXML 命名空間對應表\n- 需支援抽取 theme_name、color_scheme、font_scheme\n- 單一節點失敗不應讓整體解析中斷，可寫入 notes",
+          "summary": "該函數的目的是解析主題 XML（a:theme / clrScheme / fontScheme 等），並提取出 color_scheme、font_scheme。实现提示包括使用 ElementTree 和 OOXML 命名空间对应表，支持提取 theme_name、color_scheme、font_scheme，并在单个节点失败时不中断整体解析，可写入 notes。"
+        },
+        {
+          "name": "_get_slide_background_xml_info",
+          "docstring": "從指定頁的 slide XML / cSld / bg 等讀取背景相關原始線索（供 get_slide_background_info 彙整）。\n\n實作提示：\n- 區分 bgPr（背景樣式）與繼承母片的情況\n- 可搭配 document.prs.slides[slide_index].element\n- 嘗試辨識 solidFill / blipFill / gradFill / noFill / bgRef 等線索\n- 回傳原始線索時，保留 source 與 notes，避免過度推論",
+          "summary": "該函數的目的是從指定頁面的幻燈片 XML 中讀取背景相關的原始資訊，以供後續整理使用。該函數區分了背景樣式和繼承母片的情況，並嘗試識別不同的背景元素，最終返回包含相關資訊的字典。"
+        },
+        {
+          "name": "_detect_full_slide_picture_shape",
+          "docstring": "偵測是否為「滿版圖片 shape 模擬背景」：位置約 (0,0)、尺寸接近整張投影片。\n\n實作提示：\n- 比對 shape 類型是否為圖片、left/top/width/height 與投影片寬高（EMU）\n- 回傳是否命中、候選 shape 索引、image_ref/image_path_hint、notes\n- 容差建議使用比例閾值（例如寬高落在 98%~102%）",
+          "summary": "該函數的目的是偵測投影片中是否存在「滿版圖片 shape 模擬背景」，即位置接近(0,0)且尺寸接近整張投影片。通过比对shape类型、位置和尺寸与投影片宽高的关系，返回是否符合条件的结果及相关信息，建议使用比例容差进行判断。"
+        },
+        {
+          "name": "get_presentation_theme_info",
+          "docstring": "讀取簡報整體 theme / 佈景主題資訊。\n\n預期欄位（issues 規格）：\n- file_path, slide_count, has_theme, theme_part_name, theme_name,\n  color_scheme, font_scheme, slide_master_count, notes\n\n注意：\n- 優先讀取真實 theme XML，不足處才以 notes 說明\n- 單一欄位讀不到不可使整體失敗",
+          "summary": "該函數用於讀取簡報的整體主題/佈景主題資訊，包括文件路徑、幻燈片數量、主題名稱等。函数會優先從真實的主題XML文件中讀取資訊，若無法讀取則使用備註。"
+        },
+        {
+          "name": "get_slide_background_info",
+          "docstring": "讀取單頁投影片背景資訊。\n\nbackground_type 可能值：inherit, solid, picture, shape_picture_simulated, unknown\n\n預期欄位（issues 規格）：\n- slide_index, background_type, source, color_rgb, image_ref, image_path_hint,\n  by_shape_detection, notes\n\n判斷策略：\n- 優先使用 slide XML 背景訊號（避免只靠 shape 猜測）\n- 若偵測到滿版圖片 shape，再標示 shape_picture_simulated\n- 無法確定時回傳 unknown 並在 notes 說明依據不足",
+          "summary": "該函數的目的是讀取投影片中指定索引的背景資訊，包括背景類型、顏色、圖片等，並根據特定判斷策略來確定背景類型，若無法確定則返回未知並提供相應說明。"
+        },
+        {
+          "name": "scan_presentation_backgrounds",
+          "docstring": "掃描整份簡報每一頁背景。\n\n回傳：file_path, slide_count, theme_info（get_presentation_theme_info 結果）,\nslides（每頁為 get_slide_background_info 結果）",
+          "summary": "這個函數的目的是掃描整份簡報每一頁的背景，並返回包含文件路徑、頁數、主題信息和每頁背景信息的字典。"
+        },
+        {
+          "name": "get_shape_style",
+          "docstring": "",
+          "summary": "該函數用於獲取幻燈片中形狀的樣式。接受幻燈片索引、形狀ID或形狀索引作為參數，返回包含樣式信息的字典。"
+        },
+        {
+          "name": "set_shape_style",
+          "docstring": "",
+          "summary": "設置幻燈片中形狀的樣式，包括填充顏色、透明度、線條風格、線條顏色和線條寬度。"
+        },
+        {
+          "name": "set_shape_fill_transparency",
+          "docstring": "",
+          "summary": "設置幻燈片形狀的填充透明度和填充顏色。接受幻燈片索引、形狀ID或索引、填充透明度和填充顏色作為參數。"
         },
         {
           "name": "delete_slide",
           "docstring": "",
-          "summary": "該函數的目的是刪除幻燈片。"
+          "summary": "該函數的目的是刪除指定幻燈片。"
         },
         {
           "name": "duplicate_slide",
@@ -440,32 +874,32 @@
         {
           "name": "replace_text",
           "docstring": "",
-          "summary": "此函數的目的是替換 PowerPoint 文件中的文本。"
+          "summary": "這個函數的目的是在PPT文件中替換指定的文本內容。可以指定要替換的文本、新的文本內容以及要替換的幻燈片索引。"
         },
         {
           "name": "add_bullets",
           "docstring": "",
-          "summary": "該函數用於在指定幻燈片上添加項目符號。接受幻燈片索引、項目列表和其他格式設置作為參數，並將項目符號添加到指定位置。"
+          "summary": "該函數用於在指定投影片中添加項目符號清單。接受投影片索引、項目清單、位置和樣式等參數，並將項目符號清單添加到指定投影片中。"
         },
         {
           "name": "add_title_slide",
           "docstring": "",
-          "summary": "這個函數的目的是在PPT文件中添加標題幻燈片。"
+          "summary": "該函數用於在PPT文件中添加標題幻燈片。"
         },
         {
           "name": "reorder_slides",
           "docstring": "",
-          "summary": "此函數用於重新排序幻燈片，接受幻燈片文件和新的排序順序，並返回重新排序後的幻燈片文件。"
+          "summary": "這個函數的目的是重新排列幻燈片的順序。输入参数包括幻燈片文檔和新的順序列表，返回重新排列後的幻燈片文檔。"
         },
         {
           "name": "set_slides_background_color",
           "docstring": "",
-          "summary": "該函數用於設置幻燈片的背景顏色。接受幻燈片文檔、幻燈片索引和RGB顏色作為輸入，並返回包含設置結果的字典列表。"
+          "summary": "這個函數的目的是設置幻燈片的背景顏色。"
         },
         {
           "name": "set_slides_background_image",
           "docstring": "",
-          "summary": "該函數用於設置幻燈片的背景圖像。接受幻燈片文檔、幻燈片索引和圖像路徑作為參數，並返回一個包含字典的列表。"
+          "summary": "設置幻燈片背景圖像。接受幻燈片文檔、幻燈片索引和圖像路徑，將圖像設置為指定幻燈片的背景。"
         },
         {
           "name": "_find_libreoffice_executable",
@@ -475,17 +909,17 @@
         {
           "name": "convert_pptx_to_pdf",
           "docstring": "用 LibreOffice headless 將 PPTX 轉成 PDF",
-          "summary": "使用 LibreOffice headless 将 PPTX 转换为 PDF。"
+          "summary": "使用LibreOffice headless將PPTX轉換為PDF。"
         },
         {
           "name": "render_slide_to_image",
           "docstring": "將指定頁投影片輸出成圖片\n- 先轉 PDF\n- 再用 PyMuPDF 將指定頁 rasterize 成 png",
-          "summary": "該函數用於將指定投影片轉換為圖片，首先將投影片轉換為 PDF，然後使用 PyMuPDF 將指定頁面轉換為 PNG 格式。"
+          "summary": "該函數的目的是將指定的投影片轉換為圖片，首先將其轉換為PDF，然後使用PyMuPDF將指定頁面轉換為PNG格式。"
         },
         {
           "name": "render_slides_to_grid_image",
           "docstring": "將多頁投影片輸出並拼成一張 grid 圖",
-          "summary": "將多頁投影片輸出並拼成一張 grid 圖。"
+          "summary": "該函數用於將多頁投影片輸出並拼成一張 grid 圖。"
         }
       ]
     },
@@ -495,22 +929,22 @@
         {
           "name": "set_runtime_config",
           "docstring": "",
-          "summary": "設定運行配置，將 API 基礎路徑和超時時間設置為全局變量。"
+          "summary": "設置運行配置，將API基礎和超時時間設置為全局變量。"
         },
         {
           "name": "_request",
           "docstring": "",
-          "summary": "此函數用於發送 HTTP 請求至指定路徑，並返回相應的 JSON 數據或錯誤信息。"
+          "summary": "這個函數的目的是通過發送HTTP請求來向伺服器發送請求，並返回伺服器的回應。"
         },
         {
           "name": "_clean_rgb",
           "docstring": "",
-          "summary": "此函數用於檢查並清理RGB顏色值，確保每個值介於0到255之間，並返回清理後的顏色值列表。"
+          "summary": "此函數用於檢查並清理RGB顏色值，確保每個值介於0到255之間，並返回清理後的值列表。"
         },
         {
           "name": "health",
           "docstring": "檢查底層 PPT API server 是否存活。",
-          "summary": "檢查底層 PPT API server 是否存活。"
+          "summary": "檢查底層 PPT API 伺服器是否存活。"
         },
         {
           "name": "root_info",
@@ -525,12 +959,12 @@
         {
           "name": "get_presentation_info",
           "docstring": "讀取 PPT 基本資訊。",
-          "summary": "該函數用於讀取PPT文件的基本資訊。"
+          "summary": "該函數的目的是讀取PPT文件的基本資訊。"
         },
         {
           "name": "list_presentation_slides",
           "docstring": "列出所有投影片與 shape 摘要。",
-          "summary": "該函數的目的是列出指定檔案中所有投影片的摘要資訊。"
+          "summary": "這個函數的目的是列出指定檔案中所有投影片的摘要資訊。"
         },
         {
           "name": "save_as",
@@ -540,7 +974,7 @@
         {
           "name": "add_blank_slide",
           "docstring": "新增一張空白投影片。",
-          "summary": "新增一張空白投影片。"
+          "summary": "這個函數的目的是在指定的檔案中新增一張空白投影片。"
         },
         {
           "name": "add_blank_slides",
@@ -550,12 +984,12 @@
         {
           "name": "add_text",
           "docstring": "在指定投影片加入文字方塊。",
-          "summary": "在指定投影片加入文字方塊。"
+          "summary": "該函數的目的是在指定投影片中添加文字方塊。"
         },
         {
           "name": "add_image",
           "docstring": "在指定投影片加入圖片。",
-          "summary": "該函數的目的是在指定投影片中加入圖片。"
+          "summary": "該函數的目的是在指定投影片中添加圖片。"
         },
         {
           "name": "add_table",
@@ -565,7 +999,7 @@
         {
           "name": "add_shape",
           "docstring": "在指定投影片加入一般圖形，例如 rect / ellipse / diamond。",
-          "summary": "在指定投影片加入一般圖形，例如 rect / ellipse / diamond。"
+          "summary": "該函數的目的是在指定投影片中添加一般圖形，例如矩形/橢圓/菱形。"
         },
         {
           "name": "add_line",
@@ -575,7 +1009,7 @@
         {
           "name": "add_arrow",
           "docstring": "在指定投影片加入箭頭圖形。",
-          "summary": "該函數在指定投影片中添加箭頭圖形。"
+          "summary": "在指定投影片加入箭頭圖形。"
         },
         {
           "name": "delete_slide",
@@ -590,7 +1024,7 @@
         {
           "name": "replace_text",
           "docstring": "在整份或指定投影片中取代文字。",
-          "summary": "這個函數的目的是在整份或指定投影片中取代文字。"
+          "summary": "該函數的目的是在整份或指定投影片中取代文字。"
         },
         {
           "name": "add_bullets",
@@ -628,6 +1062,91 @@
           "summary": "設定多頁背景圖片。"
         },
         {
+          "name": "ppt_theme_info",
+          "docstring": "呼叫 GET /ppt/theme_info，讀取 PPTX 佈景主題（theme）、色彩配置、字型配置等摘要。\n需先啟動 api_server；底層邏輯由 ppt_stdio.get_presentation_theme_info 提供。",
+          "summary": "該函數的目的是呼叫 GET /ppt/theme_info，讀取 PPTX 檔案的佈景主題、色彩配置和字型配置摘要。需要先啟動 api_server，底層邏輯由 ppt_stdio.get_presentation_theme_info 提供。"
+        },
+        {
+          "name": "ppt_slide_background",
+          "docstring": "呼叫 GET /ppt/slide_background，讀取指定頁之背景類型（繼承母片、純色、圖片、滿版圖片模擬等）。",
+          "summary": "該函數的目的是呼叫 GET /ppt/slide_background，讀取指定頁面的背景類型（繼承母片、純色、圖片、滿版圖片模擬等）。"
+        },
+        {
+          "name": "ppt_slides_backgrounds",
+          "docstring": "呼叫 GET /ppt/slides_backgrounds，一次掃描整份簡報各頁背景並附帶 theme 摘要。",
+          "summary": "該函數的目的是呼叫 GET /ppt/slides_backgrounds API，掃描簡報各頁背景並提供主題摘要。"
+        },
+        {
+          "name": "ppt_textbox_style",
+          "docstring": "讀取指定文字框的底色、透明度、邊框樣式、邊框顏色。",
+          "summary": "該函數的目的是讀取指定文字框的底色、透明度、邊框樣式和邊框顏色。"
+        },
+        {
+          "name": "ppt_slide_textbox_styles",
+          "docstring": "列出指定頁全部文字框的樣式資訊。",
+          "summary": "這個函數的目的是列出指定頁面所有文字框的樣式資訊。"
+        },
+        {
+          "name": "set_textbox_style",
+          "docstring": "更新文字框底色、透明度、邊框樣式、邊框顏色與邊框寬度。",
+          "summary": "更新文字框底色、透明度、邊框樣式、邊框顏色與邊框寬度。"
+        },
+        {
+          "name": "drag_shape",
+          "docstring": "拖拉任意 shape（圖片、一般圖形、文字框），支援 left/top 絕對定位或 delta_x/delta_y 相對位移。",
+          "summary": "此函數用於拖拉任意形狀（圖片、一般圖形、文字框），支援絕對定位或相對位移。"
+        },
+        {
+          "name": "drag_textbox",
+          "docstring": "拖拉指定文字框位置（可用絕對 left/top 或相對 delta_x/delta_y，並可選調整寬高）。",
+          "summary": "此函數用於拖拉指定文字框位置，可以使用絕對(left/top)或相對(delta_x/delta_y)座標，也可以調整寬高。"
+        },
+        {
+          "name": "delete_textbox",
+          "docstring": "刪除指定文字框（可用 shape_id 或 shape_index 定位）。",
+          "summary": "刪除指定文字框（可用 shape_id 或 shape_index 定位）。"
+        },
+        {
+          "name": "add_wordart_like_textbox",
+          "docstring": "在指定頁以文字框模擬 WordArt 風格（對應 POST /ppt/add_wordart_like_textbox）。",
+          "summary": "在指定頁以文字框模擬 WordArt 風格。"
+        },
+        {
+          "name": "update_wordart_text",
+          "docstring": "更新命名或指定 id/index 的 WordArt 類文字（對應 POST /ppt/update_wordart_text）。",
+          "summary": "更新命名或指定 id/index 的 WordArt 類文字。对应 POST /ppt/update_wordart_text。"
+        },
+        {
+          "name": "delete_shape",
+          "docstring": "刪除指定頁上的任意 shape（對應 POST /ppt/delete_shape）。",
+          "summary": "刪除指定頁上的任意 shape。"
+        },
+        {
+          "name": "clone_named_shape_from_template",
+          "docstring": "依 shape 名稱從同頁複製範本並可選填新文字（對應 POST /ppt/clone_named_shape_from_template）。",
+          "summary": "該函數的目的是從指定文件中的特定頁面複製具有特定形狀名稱的範本，並可選擇性地填入新文字。"
+        },
+        {
+          "name": "parse_math_expression",
+          "docstring": "解析口語或 LaTeX（POST /ppt/parse_math_expression），不修改簡報檔。",
+          "summary": "該函數的目的是解析口語或 LaTeX 格式的數學表達式，並且不修改簡報檔案。"
+        },
+        {
+          "name": "add_equation",
+          "docstring": "新增數學式：預設 B（OMML，POST /ppt/add_equation）；render_mode=image 為 M1 圖片。",
+          "summary": "新增數學式到幻燈片中，預設為OMML格式，可選擇以圖片形式呈現。"
+        },
+        {
+          "name": "update_equation",
+          "docstring": "更新數學式：預設 B（OMML）；render_mode=image 為圖片方程式。",
+          "summary": "更新數學式，預設為OMML格式，若render_mode設置為image則為圖片方程式。"
+        },
+        {
+          "name": "delete_equation",
+          "docstring": "刪除數學式：預設 B（OMML）；render_mode=image 為圖片方程式。",
+          "summary": "刪除數學式，預設為OMML格式，可以選擇以圖片方程式方式呈現。"
+        },
+        {
           "name": "render_slide_to_image",
           "docstring": "把指定投影片輸出成單張圖片。",
           "summary": "將指定投影片轉換為單張圖片的功能。"
@@ -640,7 +1159,37 @@
         {
           "name": "main",
           "docstring": "",
-          "summary": "這個函數是用來啟動MCP伺服器，根據參數設定不同的傳輸方式和設定。"
+          "summary": "這個函數是用來啟動MCP伺服器，根據參數設定不同的傳輸方式和相關設定。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\PPTStudio\\tmp\\test_textbox_transparency_compare.py": {
+      "path": "C:\\ML_HOME\\PPTStudio\\tmp\\test_textbox_transparency_compare.py",
+      "functions": [
+        {
+          "name": "_ensure_dir",
+          "docstring": "",
+          "summary": "確保目錄存在的功能。"
+        },
+        {
+          "name": "_alpha_255_to_100000",
+          "docstring": "",
+          "summary": "這個函數將介於0到255之間的alpha值轉換為介於0到100000之間的整數。"
+        },
+        {
+          "name": "_set_fill_alpha_via_xml",
+          "docstring": "ARGB-like 寫法對應到 OOXML:\n- RGB: <a:srgbClr val=\"RRGGBB\"/>\n- Alpha: <a:alpha val=\"0~100000\"/>",
+          "summary": "此函數的目的是將ARGB類似的數值轉換為OOXML格式，設定形狀的填充顏色和透明度。透過RGB和Alpha值對應到OOXML的格式，並將其應用於形狀的填充。"
+        },
+        {
+          "name": "_build_compare_image",
+          "docstring": "",
+          "summary": "此函數的目的是建立比較圖像，將兩個圖像進行比較後生成一個新的圖像，並計算出平均差異、均方根差異和非零像素比率等統計信息。"
+        },
+        {
+          "name": "main",
+          "docstring": "",
+          "summary": "該函數的目的是在幻燈片中創建兩頁，每頁包含一個相同的文字框和深色背景，以便比較兩種不同的方法來實現半透明效果。其中一種方法使用 fill.transparency，另一種方法使用 ARGB 概念和 XML alpha。"
         }
       ]
     },
@@ -650,12 +1199,12 @@
         {
           "name": "print_title",
           "docstring": "",
-          "summary": "這個函數用來印出標題，標題文字會被放在上下各一行的分隔線之間。"
+          "summary": "這個函數的目的是打印標題，標題文字會被置中並用等號框起來。"
         },
         {
           "name": "print_result",
           "docstring": "",
-          "summary": "這個函數的目的是根據輸入的名稱和結果，打印出一條消息，如果結果是字典或列表，則以更易讀的方式打印出來。"
+          "summary": "這個函數的目的是打印測試結果，如果結果是字典或列表，則使用pprint函數打印。"
         },
         {
           "name": "ensure_dir",
@@ -665,17 +1214,82 @@
         {
           "name": "make_demo_image",
           "docstring": "",
-          "summary": "這個函數的目的是創建一個示範圖像，可以設定圖像的路徑、大小、文字內容、背景色和前景色。"
+          "summary": "製作示範圖片的函數，接受路徑、大小、文字、背景色和前景色等參數，生成一個示範圖片並保存。"
         },
         {
           "name": "safe_call",
           "docstring": "",
-          "summary": "這個函數名為safe_call，用於安全地執行其他函數，並處理可能的異常情況。"
+          "summary": "這個函數名為safe_call，用於安全地呼叫其他函數並捕獲可能的異常，如果成功則列印結果，失敗則列印錯誤信息。"
         },
         {
           "name": "main",
           "docstring": "",
-          "summary": "此函數的目的是初始化測試環境，並執行多個測試操作，包括創建圖片、打開演示文稿、獲取信息等。"
+          "summary": "該函數主要用於初始化測試環境，包括創建演示文稿和圖片等操作。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\PPTStudio\\tmp_math\\generate_math_ppt_via_api.py": {
+      "path": "C:\\ML_HOME\\PPTStudio\\tmp_math\\generate_math_ppt_via_api.py",
+      "functions": [
+        {
+          "name": "post_json",
+          "docstring": "",
+          "summary": "該函數的目的是通過API發送JSON數據到指定路徑，並返回相應的數據。"
+        },
+        {
+          "name": "ensure_ok",
+          "docstring": "",
+          "summary": "確保回應正確，若回應非字典或未包含\"ok\"鍵，則引發運行時錯誤。返回回應中的\"data\"鍵值。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\PPTStudio\\tmp_math\\generate_math_ppt_via_api_omml.py": {
+      "path": "C:\\ML_HOME\\PPTStudio\\tmp_math\\generate_math_ppt_via_api_omml.py",
+      "functions": [
+        {
+          "name": "post_json",
+          "docstring": "",
+          "summary": "該函數的目的是通過API OMML生成數學PPT文件。"
+        },
+        {
+          "name": "ensure_ok",
+          "docstring": "",
+          "summary": "確保回應正確，若回應非字典或未包含\"ok\"鍵，則引發運行時錯誤。返回回應中的\"data\"鍵對應的值。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\PPTStudio\\tmp_math\\generate_text_math_inline_via_api.py": {
+      "path": "C:\\ML_HOME\\PPTStudio\\tmp_math\\generate_text_math_inline_via_api.py",
+      "functions": [
+        {
+          "name": "px",
+          "docstring": "",
+          "summary": "這個函數的目的是將輸入的像素值轉換為EMU（英文版式單位）值。"
+        },
+        {
+          "name": "post_json",
+          "docstring": "",
+          "summary": "該函數的目的是通過 API 生成內嵌數學文本。"
+        },
+        {
+          "name": "ensure_ok",
+          "docstring": "",
+          "summary": "這個函數確保 API 回應成功，若失敗則拋出 RuntimeError，並返回回應中的數據。"
+        },
+        {
+          "name": "add_text_box",
+          "docstring": "",
+          "summary": "此函數用於在指定幻燈片上添加數學公式的內嵌文本框。"
+        },
+        {
+          "name": "add_equation_box",
+          "docstring": "",
+          "summary": "添加等式框到幻灯片中，使用给定的 LaTeX 表达式和位置参数。"
+        },
+        {
+          "name": "main",
+          "docstring": "",
+          "summary": "該函數的目的是通過 API 在幻燈片中生成包含中文和數學公式的內嵌文本框。"
         }
       ]
     }
