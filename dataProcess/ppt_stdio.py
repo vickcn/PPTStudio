@@ -71,6 +71,8 @@ DEFAULT_FONT_ZH = "微軟正黑體"
 DEFAULT_FONT_EN = "Consolas"
 
 import dataProcess as dp
+from dataProcess import ppt_table_ops as _ppt_table_ops
+
 PYTHON_PPTX_AVAILABLE = dp.ptp.PYTHON_PPTX_AVAILABLE
 Presentation = dp.ptp.Presentation
 m_logger = dp.ptp.m_logger
@@ -1750,6 +1752,430 @@ class PPTDocument:
             "subtitle": subtitle,
         }
 
+    def list_slide_tables(self, slide_index: int) -> Dict[str, Any]:
+        """列出指定頁所有表格摘要。"""
+        return _ppt_table_ops.list_slide_tables(self, slide_index)
+
+    def get_table_detail(
+            self,
+            slide_index: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+        ) -> Dict[str, Any]:
+        """取得指定表格詳細資訊。"""
+        return _ppt_table_ops.get_table_detail(self, slide_index, shape_id=shape_id, shape_index=shape_index)
+
+    def update_table_cell(
+            self,
+            slide_index: int,
+            row_idx: int,
+            col_idx: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+            text: Optional[str] = None,
+            font_name: Optional[str] = None,
+            font_size: Optional[int] = None,
+            bold: Optional[bool] = None,
+            italic: Optional[bool] = None,
+            font_color: Optional[Tuple[int, int, int]] = None,
+            fill_color: Optional[Tuple[int, int, int]] = None,
+            h_align: Optional[str] = None,
+            v_align: Optional[str] = None,
+            border_color: Optional[Tuple[int, int, int]] = None,
+            border_width: Optional[float] = None,
+            border_style: Optional[str] = None,
+            clear_text: bool = False,
+        ) -> Dict[str, Any]:
+        """更新單一儲存格文字與／或樣式。"""
+        return _ppt_table_ops.update_table_cell(
+            self,
+            slide_index,
+            row_idx,
+            col_idx,
+            shape_id=shape_id,
+            shape_index=shape_index,
+            text=text,
+            font_name=font_name,
+            font_size=font_size,
+            bold=bold,
+            italic=italic,
+            font_color=font_color,
+            fill_color=fill_color,
+            h_align=h_align,
+            v_align=v_align,
+            border_color=border_color,
+            border_width=border_width,
+            border_style=border_style,
+            clear_text=clear_text,
+        )
+
+    def set_table_cell_style(
+            self,
+            slide_index: int,
+            row_idx: int,
+            col_idx: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+            font_name: Optional[str] = None,
+            font_size: Optional[int] = None,
+            bold: Optional[bool] = None,
+            italic: Optional[bool] = None,
+            font_color: Optional[Tuple[int, int, int]] = None,
+            fill_color: Optional[Tuple[int, int, int]] = None,
+            h_align: Optional[str] = None,
+            v_align: Optional[str] = None,
+            border_color: Optional[Tuple[int, int, int]] = None,
+            border_width: Optional[float] = None,
+            border_style: Optional[str] = None,
+        ) -> Dict[str, Any]:
+        """設定單一儲存格樣式。"""
+        return _ppt_table_ops.set_table_cell_style(
+            self,
+            slide_index,
+            row_idx,
+            col_idx,
+            shape_id=shape_id,
+            shape_index=shape_index,
+            font_name=font_name,
+            font_size=font_size,
+            bold=bold,
+            italic=italic,
+            font_color=font_color,
+            fill_color=fill_color,
+            h_align=h_align,
+            v_align=v_align,
+            border_color=border_color,
+            border_width=border_width,
+            border_style=border_style,
+        )
+
+    def update_table_row(
+            self,
+            slide_index: int,
+            row_idx: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+            row_text: Optional[str] = None,
+            cell_texts: Optional[List[str]] = None,
+            font_name: Optional[str] = None,
+            font_size: Optional[int] = None,
+            bold: Optional[bool] = None,
+            italic: Optional[bool] = None,
+            font_color: Optional[Tuple[int, int, int]] = None,
+            fill_color: Optional[Tuple[int, int, int]] = None,
+            h_align: Optional[str] = None,
+            v_align: Optional[str] = None,
+        ) -> Dict[str, Any]:
+        """更新整列。"""
+        return _ppt_table_ops.update_table_row(
+            self,
+            slide_index,
+            row_idx,
+            shape_id=shape_id,
+            shape_index=shape_index,
+            row_text=row_text,
+            cell_texts=cell_texts,
+            font_name=font_name,
+            font_size=font_size,
+            bold=bold,
+            italic=italic,
+            font_color=font_color,
+            fill_color=fill_color,
+            h_align=h_align,
+            v_align=v_align,
+        )
+
+    def update_table_column(
+            self,
+            slide_index: int,
+            col_idx: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+            column_text: Optional[str] = None,
+            cell_texts: Optional[List[str]] = None,
+            font_name: Optional[str] = None,
+            font_size: Optional[int] = None,
+            bold: Optional[bool] = None,
+            italic: Optional[bool] = None,
+            font_color: Optional[Tuple[int, int, int]] = None,
+            fill_color: Optional[Tuple[int, int, int]] = None,
+            h_align: Optional[str] = None,
+            v_align: Optional[str] = None,
+        ) -> Dict[str, Any]:
+        """更新整欄。"""
+        return _ppt_table_ops.update_table_column(
+            self,
+            slide_index,
+            col_idx,
+            shape_id=shape_id,
+            shape_index=shape_index,
+            column_text=column_text,
+            cell_texts=cell_texts,
+            font_name=font_name,
+            font_size=font_size,
+            bold=bold,
+            italic=italic,
+            font_color=font_color,
+            fill_color=fill_color,
+            h_align=h_align,
+            v_align=v_align,
+        )
+
+    def set_table_row_style(
+            self,
+            slide_index: int,
+            row_idx: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+            font_name: Optional[str] = None,
+            font_size: Optional[int] = None,
+            bold: Optional[bool] = None,
+            italic: Optional[bool] = None,
+            font_color: Optional[Tuple[int, int, int]] = None,
+            fill_color: Optional[Tuple[int, int, int]] = None,
+            h_align: Optional[str] = None,
+            v_align: Optional[str] = None,
+            border_color: Optional[Tuple[int, int, int]] = None,
+            border_width: Optional[float] = None,
+            border_style: Optional[str] = None,
+        ) -> Dict[str, Any]:
+        """設定整列樣式。"""
+        return _ppt_table_ops.set_table_row_style(
+            self,
+            slide_index,
+            row_idx,
+            shape_id=shape_id,
+            shape_index=shape_index,
+            font_name=font_name,
+            font_size=font_size,
+            bold=bold,
+            italic=italic,
+            font_color=font_color,
+            fill_color=fill_color,
+            h_align=h_align,
+            v_align=v_align,
+            border_color=border_color,
+            border_width=border_width,
+            border_style=border_style,
+        )
+
+    def set_table_column_style(
+            self,
+            slide_index: int,
+            col_idx: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+            font_name: Optional[str] = None,
+            font_size: Optional[int] = None,
+            bold: Optional[bool] = None,
+            italic: Optional[bool] = None,
+            font_color: Optional[Tuple[int, int, int]] = None,
+            fill_color: Optional[Tuple[int, int, int]] = None,
+            h_align: Optional[str] = None,
+            v_align: Optional[str] = None,
+            border_color: Optional[Tuple[int, int, int]] = None,
+            border_width: Optional[float] = None,
+            border_style: Optional[str] = None,
+        ) -> Dict[str, Any]:
+        """設定整欄樣式。"""
+        return _ppt_table_ops.set_table_column_style(
+            self,
+            slide_index,
+            col_idx,
+            shape_id=shape_id,
+            shape_index=shape_index,
+            font_name=font_name,
+            font_size=font_size,
+            bold=bold,
+            italic=italic,
+            font_color=font_color,
+            fill_color=fill_color,
+            h_align=h_align,
+            v_align=v_align,
+            border_color=border_color,
+            border_width=border_width,
+            border_style=border_style,
+        )
+
+    def set_table_row_height(
+            self,
+            slide_index: int,
+            row_idx: int,
+            height_emu: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+        ) -> Dict[str, Any]:
+        """設定列高（EMU）。"""
+        return _ppt_table_ops.set_table_row_height(
+            self,
+            slide_index,
+            row_idx,
+            height_emu,
+            shape_id=shape_id,
+            shape_index=shape_index,
+        )
+
+    def set_table_column_width(
+            self,
+            slide_index: int,
+            col_idx: int,
+            width_emu: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+        ) -> Dict[str, Any]:
+        """設定欄寬（EMU）。"""
+        return _ppt_table_ops.set_table_column_width(
+            self,
+            slide_index,
+            col_idx,
+            width_emu,
+            shape_id=shape_id,
+            shape_index=shape_index,
+        )
+
+    def distribute_table_column_widths(
+            self,
+            slide_index: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+            column_indices: Optional[List[int]] = None,
+        ) -> Dict[str, Any]:
+        """平均分配欄寬。"""
+        return _ppt_table_ops.distribute_table_column_widths(
+            self,
+            slide_index,
+            shape_id=shape_id,
+            shape_index=shape_index,
+            column_indices=column_indices,
+        )
+
+    def distribute_table_row_heights(
+            self,
+            slide_index: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+            row_indices: Optional[List[int]] = None,
+        ) -> Dict[str, Any]:
+        """平均分配列高。"""
+        return _ppt_table_ops.distribute_table_row_heights(
+            self,
+            slide_index,
+            shape_id=shape_id,
+            shape_index=shape_index,
+            row_indices=row_indices,
+        )
+
+    def delete_table(
+            self,
+            slide_index: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+        ) -> Dict[str, Any]:
+        """刪除整個表格。"""
+        return _ppt_table_ops.delete_table(self, slide_index, shape_id=shape_id, shape_index=shape_index)
+
+    def rebuild_table_with_modified_structure(
+            self,
+            slide_index: int,
+            new_rows: int,
+            new_cols: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+            first_row_as_header: bool = False,
+            font_size: int = 14,
+        ) -> Dict[str, Any]:
+        """以新列欄數重建表格（保留可對應文字）。"""
+        return _ppt_table_ops.rebuild_table_with_modified_structure(
+            self,
+            slide_index,
+            new_rows,
+            new_cols,
+            shape_id=shape_id,
+            shape_index=shape_index,
+            first_row_as_header=first_row_as_header,
+            font_size=font_size,
+        )
+
+    def insert_table_row(
+            self,
+            slide_index: int,
+            insert_before: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+            first_row_as_header: bool = False,
+            font_size: int = 14,
+        ) -> Dict[str, Any]:
+        """插入一列（重建表格）。"""
+        return _ppt_table_ops.insert_table_row(
+            self,
+            slide_index,
+            insert_before,
+            shape_id=shape_id,
+            shape_index=shape_index,
+            first_row_as_header=first_row_as_header,
+            font_size=font_size,
+        )
+
+    def delete_table_row(
+            self,
+            slide_index: int,
+            row_idx: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+            first_row_as_header: bool = False,
+            font_size: int = 14,
+        ) -> Dict[str, Any]:
+        """刪除一列（重建表格）。"""
+        return _ppt_table_ops.delete_table_row(
+            self,
+            slide_index,
+            row_idx,
+            shape_id=shape_id,
+            shape_index=shape_index,
+            first_row_as_header=first_row_as_header,
+            font_size=font_size,
+        )
+
+    def insert_table_column(
+            self,
+            slide_index: int,
+            insert_before: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+            first_row_as_header: bool = False,
+            font_size: int = 14,
+        ) -> Dict[str, Any]:
+        """插入一欄（重建表格）。"""
+        return _ppt_table_ops.insert_table_column(
+            self,
+            slide_index,
+            insert_before,
+            shape_id=shape_id,
+            shape_index=shape_index,
+            first_row_as_header=first_row_as_header,
+            font_size=font_size,
+        )
+
+    def delete_table_column(
+            self,
+            slide_index: int,
+            col_idx: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+            first_row_as_header: bool = False,
+            font_size: int = 14,
+        ) -> Dict[str, Any]:
+        """刪除一欄（重建表格）。"""
+        return _ppt_table_ops.delete_table_column(
+            self,
+            slide_index,
+            col_idx,
+            shape_id=shape_id,
+            shape_index=shape_index,
+            first_row_as_header=first_row_as_header,
+            font_size=font_size,
+        )
+
     def reorder_slides(self, new_order: List[int]) -> Dict[str, Any]:
         slide_count = len(self.prs.slides)
 
@@ -3348,6 +3774,403 @@ def add_table(
         width=width,
         height=height,
         data=data,
+        first_row_as_header=first_row_as_header,
+        font_size=font_size,
+    )
+
+
+def list_slide_tables(document: PPTDocument, slide_index: int) -> Dict[str, Any]:
+    return document.list_slide_tables(slide_index)
+
+
+def get_table_detail(
+        document: PPTDocument,
+        slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    return document.get_table_detail(slide_index, shape_id=shape_id, shape_index=shape_index)
+
+
+def update_table_cell(
+        document: PPTDocument,
+        slide_index: int,
+        row_idx: int,
+        col_idx: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        text: Optional[str] = None,
+        font_name: Optional[str] = None,
+        font_size: Optional[int] = None,
+        bold: Optional[bool] = None,
+        italic: Optional[bool] = None,
+        font_color: Optional[Tuple[int, int, int]] = None,
+        fill_color: Optional[Tuple[int, int, int]] = None,
+        h_align: Optional[str] = None,
+        v_align: Optional[str] = None,
+        border_color: Optional[Tuple[int, int, int]] = None,
+        border_width: Optional[float] = None,
+        border_style: Optional[str] = None,
+        clear_text: bool = False,
+    ) -> Dict[str, Any]:
+    return document.update_table_cell(
+        slide_index,
+        row_idx,
+        col_idx,
+        shape_id=shape_id,
+        shape_index=shape_index,
+        text=text,
+        font_name=font_name,
+        font_size=font_size,
+        bold=bold,
+        italic=italic,
+        font_color=font_color,
+        fill_color=fill_color,
+        h_align=h_align,
+        v_align=v_align,
+        border_color=border_color,
+        border_width=border_width,
+        border_style=border_style,
+        clear_text=clear_text,
+    )
+
+
+def set_table_cell_style(
+        document: PPTDocument,
+        slide_index: int,
+        row_idx: int,
+        col_idx: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        font_name: Optional[str] = None,
+        font_size: Optional[int] = None,
+        bold: Optional[bool] = None,
+        italic: Optional[bool] = None,
+        font_color: Optional[Tuple[int, int, int]] = None,
+        fill_color: Optional[Tuple[int, int, int]] = None,
+        h_align: Optional[str] = None,
+        v_align: Optional[str] = None,
+        border_color: Optional[Tuple[int, int, int]] = None,
+        border_width: Optional[float] = None,
+        border_style: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    return document.set_table_cell_style(
+        slide_index,
+        row_idx,
+        col_idx,
+        shape_id=shape_id,
+        shape_index=shape_index,
+        font_name=font_name,
+        font_size=font_size,
+        bold=bold,
+        italic=italic,
+        font_color=font_color,
+        fill_color=fill_color,
+        h_align=h_align,
+        v_align=v_align,
+        border_color=border_color,
+        border_width=border_width,
+        border_style=border_style,
+    )
+
+
+def update_table_row(
+        document: PPTDocument,
+        slide_index: int,
+        row_idx: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        row_text: Optional[str] = None,
+        cell_texts: Optional[List[str]] = None,
+        font_name: Optional[str] = None,
+        font_size: Optional[int] = None,
+        bold: Optional[bool] = None,
+        italic: Optional[bool] = None,
+        font_color: Optional[Tuple[int, int, int]] = None,
+        fill_color: Optional[Tuple[int, int, int]] = None,
+        h_align: Optional[str] = None,
+        v_align: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    return document.update_table_row(
+        slide_index,
+        row_idx,
+        shape_id=shape_id,
+        shape_index=shape_index,
+        row_text=row_text,
+        cell_texts=cell_texts,
+        font_name=font_name,
+        font_size=font_size,
+        bold=bold,
+        italic=italic,
+        font_color=font_color,
+        fill_color=fill_color,
+        h_align=h_align,
+        v_align=v_align,
+    )
+
+
+def update_table_column(
+        document: PPTDocument,
+        slide_index: int,
+        col_idx: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        column_text: Optional[str] = None,
+        cell_texts: Optional[List[str]] = None,
+        font_name: Optional[str] = None,
+        font_size: Optional[int] = None,
+        bold: Optional[bool] = None,
+        italic: Optional[bool] = None,
+        font_color: Optional[Tuple[int, int, int]] = None,
+        fill_color: Optional[Tuple[int, int, int]] = None,
+        h_align: Optional[str] = None,
+        v_align: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    return document.update_table_column(
+        slide_index,
+        col_idx,
+        shape_id=shape_id,
+        shape_index=shape_index,
+        column_text=column_text,
+        cell_texts=cell_texts,
+        font_name=font_name,
+        font_size=font_size,
+        bold=bold,
+        italic=italic,
+        font_color=font_color,
+        fill_color=fill_color,
+        h_align=h_align,
+        v_align=v_align,
+    )
+
+
+def set_table_row_style(
+        document: PPTDocument,
+        slide_index: int,
+        row_idx: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        font_name: Optional[str] = None,
+        font_size: Optional[int] = None,
+        bold: Optional[bool] = None,
+        italic: Optional[bool] = None,
+        font_color: Optional[Tuple[int, int, int]] = None,
+        fill_color: Optional[Tuple[int, int, int]] = None,
+        h_align: Optional[str] = None,
+        v_align: Optional[str] = None,
+        border_color: Optional[Tuple[int, int, int]] = None,
+        border_width: Optional[float] = None,
+        border_style: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    return document.set_table_row_style(
+        slide_index,
+        row_idx,
+        shape_id=shape_id,
+        shape_index=shape_index,
+        font_name=font_name,
+        font_size=font_size,
+        bold=bold,
+        italic=italic,
+        font_color=font_color,
+        fill_color=fill_color,
+        h_align=h_align,
+        v_align=v_align,
+        border_color=border_color,
+        border_width=border_width,
+        border_style=border_style,
+    )
+
+
+def set_table_column_style(
+        document: PPTDocument,
+        slide_index: int,
+        col_idx: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        font_name: Optional[str] = None,
+        font_size: Optional[int] = None,
+        bold: Optional[bool] = None,
+        italic: Optional[bool] = None,
+        font_color: Optional[Tuple[int, int, int]] = None,
+        fill_color: Optional[Tuple[int, int, int]] = None,
+        h_align: Optional[str] = None,
+        v_align: Optional[str] = None,
+        border_color: Optional[Tuple[int, int, int]] = None,
+        border_width: Optional[float] = None,
+        border_style: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    return document.set_table_column_style(
+        slide_index,
+        col_idx,
+        shape_id=shape_id,
+        shape_index=shape_index,
+        font_name=font_name,
+        font_size=font_size,
+        bold=bold,
+        italic=italic,
+        font_color=font_color,
+        fill_color=fill_color,
+        h_align=h_align,
+        v_align=v_align,
+        border_color=border_color,
+        border_width=border_width,
+        border_style=border_style,
+    )
+
+
+def set_table_row_height(
+        document: PPTDocument,
+        slide_index: int,
+        row_idx: int,
+        height_emu: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    return document.set_table_row_height(slide_index, row_idx, height_emu, shape_id=shape_id, shape_index=shape_index)
+
+
+def set_table_column_width(
+        document: PPTDocument,
+        slide_index: int,
+        col_idx: int,
+        width_emu: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    return document.set_table_column_width(slide_index, col_idx, width_emu, shape_id=shape_id, shape_index=shape_index)
+
+
+def distribute_table_column_widths(
+        document: PPTDocument,
+        slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        column_indices: Optional[List[int]] = None,
+    ) -> Dict[str, Any]:
+    return document.distribute_table_column_widths(
+        slide_index,
+        shape_id=shape_id,
+        shape_index=shape_index,
+        column_indices=column_indices,
+    )
+
+
+def distribute_table_row_heights(
+        document: PPTDocument,
+        slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        row_indices: Optional[List[int]] = None,
+    ) -> Dict[str, Any]:
+    return document.distribute_table_row_heights(
+        slide_index,
+        shape_id=shape_id,
+        shape_index=shape_index,
+        row_indices=row_indices,
+    )
+
+
+def delete_table(
+        document: PPTDocument,
+        slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    return document.delete_table(slide_index, shape_id=shape_id, shape_index=shape_index)
+
+
+def rebuild_table_with_modified_structure(
+        document: PPTDocument,
+        slide_index: int,
+        new_rows: int,
+        new_cols: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        first_row_as_header: bool = False,
+        font_size: int = 14,
+    ) -> Dict[str, Any]:
+    return document.rebuild_table_with_modified_structure(
+        slide_index,
+        new_rows,
+        new_cols,
+        shape_id=shape_id,
+        shape_index=shape_index,
+        first_row_as_header=first_row_as_header,
+        font_size=font_size,
+    )
+
+
+def insert_table_row(
+        document: PPTDocument,
+        slide_index: int,
+        insert_before: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        first_row_as_header: bool = False,
+        font_size: int = 14,
+    ) -> Dict[str, Any]:
+    return document.insert_table_row(
+        slide_index,
+        insert_before,
+        shape_id=shape_id,
+        shape_index=shape_index,
+        first_row_as_header=first_row_as_header,
+        font_size=font_size,
+    )
+
+
+def delete_table_row(
+        document: PPTDocument,
+        slide_index: int,
+        row_idx: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        first_row_as_header: bool = False,
+        font_size: int = 14,
+    ) -> Dict[str, Any]:
+    return document.delete_table_row(
+        slide_index,
+        row_idx,
+        shape_id=shape_id,
+        shape_index=shape_index,
+        first_row_as_header=first_row_as_header,
+        font_size=font_size,
+    )
+
+
+def insert_table_column(
+        document: PPTDocument,
+        slide_index: int,
+        insert_before: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        first_row_as_header: bool = False,
+        font_size: int = 14,
+    ) -> Dict[str, Any]:
+    return document.insert_table_column(
+        slide_index,
+        insert_before,
+        shape_id=shape_id,
+        shape_index=shape_index,
+        first_row_as_header=first_row_as_header,
+        font_size=font_size,
+    )
+
+
+def delete_table_column(
+        document: PPTDocument,
+        slide_index: int,
+        col_idx: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        first_row_as_header: bool = False,
+        font_size: int = 14,
+    ) -> Dict[str, Any]:
+    return document.delete_table_column(
+        slide_index,
+        col_idx,
+        shape_id=shape_id,
+        shape_index=shape_index,
         first_row_as_header=first_row_as_header,
         font_size=font_size,
     )

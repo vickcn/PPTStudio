@@ -1,24 +1,23 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 mcp_server.py
 
-把既有的 FastAPI PPT API 包成 MCP server。
-預設以 stdio transport 執行，適合 Cursor / Claude Desktop / 自建 MCP Gateway。
-也可切成 streamable-http transport。
-
-需求：
+Usage:
+FastAPI PPT API MCP server using stdio transport for Cursor / Claude Desktop / MCP Gateway using streamable-http transport.
+Dependencies:
     pip install "mcp[cli]" httpx
 
-範例：
+Commands:
     python mcp_server.py
     python mcp_server.py --api-base http://10.1.3.127:6414 --transport stdio
     python mcp_server.py --api-base http://10.1.3.127:6414 --transport streamable-http --host 10.1.3.127 --port 6414
 
-注意：
-1. 你的 api_server.py 需先啟動，例如：
-       uvicorn api_server:app --host 10.1.3.127 --port 6414
-2. 目前 api_server.py 內的 /ppt/add_shape 端點會依賴 add_shape，
-   但原檔 import 區沒有匯入 add_shape；若未補上，該工具呼叫時會失敗。
+Usage:
+1. Start FastAPI PPT API server:       uvicorn api_server:app --host 10.1.3.127 --port 6414
+2. Start MCP server:
+    python mcp_server.py
+    python mcp_server.py --api-base http://10.1.3.127:6414 --transport stdio
+    python mcp_server.py --api-base http://10.1.3.127:6414 --transport streamable-http --host 10.1.3.127 --port 6414
 """
 
 from __future__ import annotations
@@ -83,25 +82,114 @@ def _clean_rgb(rgb: Optional[List[int]]) -> Optional[List[int]]:
     if rgb is None:
         return None
     if len(rgb) != 3:
-        raise ValueError("rgb / color 必須是 3 個整數 [R, G, B]")
+        raise ValueError("rgb / color must be [R, G, B]")
     vals = [int(v) for v in rgb]
     for v in vals:
         if v < 0 or v > 255:
-            raise ValueError("rgb / color 每個值都必須介於 0~255")
+            raise ValueError("rgb / color must be between 0 and 255")
     return vals
 
 
 @mcp.tool()
 async def health() -> Dict[str, Any]:
-    """檢查底層 PPT API server 是否存活。"""
+    """Check whether the PPT API server is healthy."""
     return await _request("GET", "/health")
 
 
 @mcp.tool()
 async def root_info() -> Dict[str, Any]:
-    """取得底層 PPT API server 的基本資訊。"""
+    """Get basic root info from the PPT API server."""
     return await _request("GET", "/")
 
+
+@mcp.tool()
+async def import_file(
+    file_path: str,
+    file_type: Optional[str] = None,
+    options: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Import file via file_importers (ppt_parser-backed for .pptx)."""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "file_type": file_type,
+        "options": options,
+    }
+    return await _request("POST", "/ppt/import_file", json_body=body)
+
+
+@mcp.tool()
+async def process_file(
+    file_path: str,
+    filename: Optional[str] = None,
+    options: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Process file via file_importers.process_file."""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "filename": filename,
+        "options": options,
+    }
+    return await _request("POST", "/ppt/process_file", json_body=body)
+
+
+@mcp.tool()
+async def run_stage_extract(
+    local_path: str,
+    filename: Optional[str] = None,
+    config: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Run extract stage via file_importers.run_stage_extract."""
+    body: Dict[str, Any] = {
+        "local_path": local_path,
+        "filename": filename,
+        "config": config,
+    }
+    return await _request("POST", "/ppt/run_stage_extract", json_body=body)
+
+
+@mcp.tool()
+async def run_stage_segment(
+    import_result: Dict[str, Any],
+    options: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Run segment stage via file_importers.run_stage_segment."""
+    body: Dict[str, Any] = {
+        "import_result": import_result,
+        "options": options,
+    }
+    return await _request("POST", "/ppt/run_stage_segment", json_body=body)
+
+
+@mcp.tool()
+async def run_stage_chunk(
+    segment_result: Dict[str, Any],
+    options: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Run chunk stage via file_importers.run_stage_chunk."""
+    body: Dict[str, Any] = {
+        "segment_result": segment_result,
+        "options": options,
+    }
+    return await _request("POST", "/ppt/run_stage_chunk", json_body=body)
+
+
+@mcp.tool()
+async def run_parser_pipeline(
+    file_path: str,
+    file_type: Optional[str] = None,
+    import_options: Optional[Dict[str, Any]] = None,
+    segment_options: Optional[Dict[str, Any]] = None,
+    chunk_options: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Run import->segment->chunk pipeline via file_importers."""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "file_type": file_type,
+        "import_options": import_options,
+        "segment_options": segment_options,
+        "chunk_options": chunk_options,
+    }
+    return await _request("POST", "/ppt/run_parser_pipeline", json_body=body)
 
 @mcp.tool()
 async def new_presentation(
@@ -111,7 +199,7 @@ async def new_presentation(
     plank_page_height: int = 1920,
     dpi: int = 96,
 ) -> Dict[str, Any]:
-    """建立新的 PPTX 檔案。"""
+    """Create a new PPTX file."""
     return await _request(
         "POST",
         "/ppt/new",
@@ -127,19 +215,19 @@ async def new_presentation(
 
 @mcp.tool()
 async def get_presentation_info(file_path: str) -> Dict[str, Any]:
-    """讀取 PPT 基本資訊。"""
+    """Get presentation info."""
     return await _request("GET", "/ppt/info", params={"file_path": file_path})
 
 
 @mcp.tool()
 async def list_presentation_slides(file_path: str) -> Dict[str, Any]:
-    """列出所有投影片與 shape 摘要。"""
+    """List presentation slides."""
     return await _request("GET", "/ppt/slides", params={"file_path": file_path})
 
 
 @mcp.tool()
 async def save_as(file_path: str, save_as: str) -> Dict[str, Any]:
-    """另存 PPT 到新路徑。"""
+    """Save as."""
     return await _request(
         "POST",
         "/ppt/save_as",
@@ -152,7 +240,7 @@ async def save_as(file_path: str, save_as: str) -> Dict[str, Any]:
 
 @mcp.tool()
 async def add_blank_slide(file_path: str, save_as: Optional[str] = None) -> Dict[str, Any]:
-    """新增一張空白投影片。"""
+    """Add a blank slide."""
     body: Dict[str, Any] = {"file_path": file_path, "page_num": 1}
     if save_as:
         body["save_as"] = save_as
@@ -161,7 +249,7 @@ async def add_blank_slide(file_path: str, save_as: Optional[str] = None) -> Dict
 
 @mcp.tool()
 async def add_blank_slides(file_path: str, page_num: int = 1, save_as: Optional[str] = None) -> Dict[str, Any]:
-    """新增多張空白投影片。"""
+    """Add blank slides."""
     body: Dict[str, Any] = {"file_path": file_path, "page_num": page_num}
     if save_as:
         body["save_as"] = save_as
@@ -185,7 +273,7 @@ async def add_text(
     align: str = "left",
     save_as: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """在指定投影片加入文字方塊。"""
+    """Add text."""
     body: Dict[str, Any] = {
         "file_path": file_path,
         "slide_index": slide_index,
@@ -218,7 +306,7 @@ async def add_image(
     keep_aspect_ratio: bool = True,
     save_as: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """在指定投影片加入圖片。"""
+    """Add image."""
     body: Dict[str, Any] = {
         "file_path": file_path,
         "slide_index": slide_index,
@@ -249,7 +337,7 @@ async def add_table(
     font_size: int = 14,
     save_as: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """在指定投影片加入表格。"""
+    """Add table."""
     body: Dict[str, Any] = {
         "file_path": file_path,
         "slide_index": slide_index,
@@ -266,6 +354,544 @@ async def add_table(
     if save_as:
         body["save_as"] = save_as
     return await _request("POST", "/ppt/add_table", json_body=body)
+
+
+@mcp.tool()
+async def slide_tables(file_path: str, slide_index: int = 0) -> Dict[str, Any]:
+    """列出指定頁所有表格（GET /ppt/slide_tables）。"""
+    return await _request(
+        "GET",
+        "/ppt/slide_tables",
+        params={"file_path": file_path, "slide_index": slide_index},
+    )
+
+
+@mcp.tool()
+async def table_detail(
+    file_path: str,
+    slide_index: int,
+    shape_id: Optional[int] = None,
+    shape_index: Optional[int] = None,
+) -> Dict[str, Any]:
+    """取得表格詳細（GET /ppt/table_detail）。"""
+    params: Dict[str, Any] = {"file_path": file_path, "slide_index": slide_index}
+    if shape_id is not None:
+        params["shape_id"] = shape_id
+    if shape_index is not None:
+        params["shape_index"] = shape_index
+    return await _request("GET", "/ppt/table_detail", params=params)
+
+
+@mcp.tool()
+async def update_table_cell(
+    file_path: str,
+    slide_index: int,
+    row_idx: int,
+    col_idx: int,
+    shape_id: Optional[int] = None,
+    shape_index: Optional[int] = None,
+    text: Optional[str] = None,
+    font_name: Optional[str] = None,
+    font_size: Optional[int] = None,
+    bold: Optional[bool] = None,
+    italic: Optional[bool] = None,
+    font_color: Optional[List[int]] = None,
+    fill_color: Optional[List[int]] = None,
+    h_align: Optional[str] = None,
+    v_align: Optional[str] = None,
+    border_color: Optional[List[int]] = None,
+    border_width: Optional[float] = None,
+    border_style: Optional[str] = None,
+    clear_text: bool = False,
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """更新單一儲存格（POST /ppt/update_table_cell）。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "row_idx": row_idx,
+        "col_idx": col_idx,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+        "text": text,
+        "font_name": font_name,
+        "font_size": font_size,
+        "bold": bold,
+        "italic": italic,
+        "font_color": _clean_rgb(font_color) if font_color is not None else None,
+        "fill_color": _clean_rgb(fill_color) if fill_color is not None else None,
+        "h_align": h_align,
+        "v_align": v_align,
+        "border_color": _clean_rgb(border_color) if border_color is not None else None,
+        "border_width": border_width,
+        "border_style": border_style,
+        "clear_text": clear_text,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/update_table_cell", json_body=body)
+
+
+@mcp.tool()
+async def set_table_cell_style(
+    file_path: str,
+    slide_index: int,
+    row_idx: int,
+    col_idx: int,
+    shape_id: Optional[int] = None,
+    shape_index: Optional[int] = None,
+    font_name: Optional[str] = None,
+    font_size: Optional[int] = None,
+    bold: Optional[bool] = None,
+    italic: Optional[bool] = None,
+    font_color: Optional[List[int]] = None,
+    fill_color: Optional[List[int]] = None,
+    h_align: Optional[str] = None,
+    v_align: Optional[str] = None,
+    border_color: Optional[List[int]] = None,
+    border_width: Optional[float] = None,
+    border_style: Optional[str] = None,
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """設定單格樣式（POST /ppt/set_table_cell_style）。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "row_idx": row_idx,
+        "col_idx": col_idx,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+        "font_name": font_name,
+        "font_size": font_size,
+        "bold": bold,
+        "italic": italic,
+        "font_color": _clean_rgb(font_color) if font_color is not None else None,
+        "fill_color": _clean_rgb(fill_color) if fill_color is not None else None,
+        "h_align": h_align,
+        "v_align": v_align,
+        "border_color": _clean_rgb(border_color) if border_color is not None else None,
+        "border_width": border_width,
+        "border_style": border_style,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/set_table_cell_style", json_body=body)
+
+
+@mcp.tool()
+async def update_table_row(
+    file_path: str,
+    slide_index: int,
+    row_idx: int,
+    shape_id: Optional[int] = None,
+    shape_index: Optional[int] = None,
+    row_text: Optional[str] = None,
+    cell_texts: Optional[List[str]] = None,
+    font_name: Optional[str] = None,
+    font_size: Optional[int] = None,
+    bold: Optional[bool] = None,
+    italic: Optional[bool] = None,
+    font_color: Optional[List[int]] = None,
+    fill_color: Optional[List[int]] = None,
+    h_align: Optional[str] = None,
+    v_align: Optional[str] = None,
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """更新整列（POST /ppt/update_table_row）。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "row_idx": row_idx,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+        "row_text": row_text,
+        "cell_texts": cell_texts,
+        "font_name": font_name,
+        "font_size": font_size,
+        "bold": bold,
+        "italic": italic,
+        "font_color": _clean_rgb(font_color) if font_color is not None else None,
+        "fill_color": _clean_rgb(fill_color) if fill_color is not None else None,
+        "h_align": h_align,
+        "v_align": v_align,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/update_table_row", json_body=body)
+
+
+@mcp.tool()
+async def update_table_column(
+    file_path: str,
+    slide_index: int,
+    col_idx: int,
+    shape_id: Optional[int] = None,
+    shape_index: Optional[int] = None,
+    column_text: Optional[str] = None,
+    cell_texts: Optional[List[str]] = None,
+    font_name: Optional[str] = None,
+    font_size: Optional[int] = None,
+    bold: Optional[bool] = None,
+    italic: Optional[bool] = None,
+    font_color: Optional[List[int]] = None,
+    fill_color: Optional[List[int]] = None,
+    h_align: Optional[str] = None,
+    v_align: Optional[str] = None,
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """更新整欄（POST /ppt/update_table_column）。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "col_idx": col_idx,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+        "column_text": column_text,
+        "cell_texts": cell_texts,
+        "font_name": font_name,
+        "font_size": font_size,
+        "bold": bold,
+        "italic": italic,
+        "font_color": _clean_rgb(font_color) if font_color is not None else None,
+        "fill_color": _clean_rgb(fill_color) if fill_color is not None else None,
+        "h_align": h_align,
+        "v_align": v_align,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/update_table_column", json_body=body)
+
+
+@mcp.tool()
+async def set_table_row_style(
+    file_path: str,
+    slide_index: int,
+    row_idx: int,
+    shape_id: Optional[int] = None,
+    shape_index: Optional[int] = None,
+    font_name: Optional[str] = None,
+    font_size: Optional[int] = None,
+    bold: Optional[bool] = None,
+    italic: Optional[bool] = None,
+    font_color: Optional[List[int]] = None,
+    fill_color: Optional[List[int]] = None,
+    h_align: Optional[str] = None,
+    v_align: Optional[str] = None,
+    border_color: Optional[List[int]] = None,
+    border_width: Optional[float] = None,
+    border_style: Optional[str] = None,
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """設定整列樣式（POST /ppt/set_table_row_style）。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "row_idx": row_idx,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+        "font_name": font_name,
+        "font_size": font_size,
+        "bold": bold,
+        "italic": italic,
+        "font_color": _clean_rgb(font_color) if font_color is not None else None,
+        "fill_color": _clean_rgb(fill_color) if fill_color is not None else None,
+        "h_align": h_align,
+        "v_align": v_align,
+        "border_color": _clean_rgb(border_color) if border_color is not None else None,
+        "border_width": border_width,
+        "border_style": border_style,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/set_table_row_style", json_body=body)
+
+
+@mcp.tool()
+async def set_table_column_style(
+    file_path: str,
+    slide_index: int,
+    col_idx: int,
+    shape_id: Optional[int] = None,
+    shape_index: Optional[int] = None,
+    font_name: Optional[str] = None,
+    font_size: Optional[int] = None,
+    bold: Optional[bool] = None,
+    italic: Optional[bool] = None,
+    font_color: Optional[List[int]] = None,
+    fill_color: Optional[List[int]] = None,
+    h_align: Optional[str] = None,
+    v_align: Optional[str] = None,
+    border_color: Optional[List[int]] = None,
+    border_width: Optional[float] = None,
+    border_style: Optional[str] = None,
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """設定整欄樣式（POST /ppt/set_table_column_style）。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "col_idx": col_idx,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+        "font_name": font_name,
+        "font_size": font_size,
+        "bold": bold,
+        "italic": italic,
+        "font_color": _clean_rgb(font_color) if font_color is not None else None,
+        "fill_color": _clean_rgb(fill_color) if fill_color is not None else None,
+        "h_align": h_align,
+        "v_align": v_align,
+        "border_color": _clean_rgb(border_color) if border_color is not None else None,
+        "border_width": border_width,
+        "border_style": border_style,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/set_table_column_style", json_body=body)
+
+
+@mcp.tool()
+async def distribute_table_column_widths(
+    file_path: str,
+    slide_index: int,
+    shape_id: Optional[int] = None,
+    shape_index: Optional[int] = None,
+    column_indices: Optional[List[int]] = None,
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """平均欄寬（POST /ppt/distribute_table_column_widths）。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+        "column_indices": column_indices,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/distribute_table_column_widths", json_body=body)
+
+
+@mcp.tool()
+async def distribute_table_row_heights(
+    file_path: str,
+    slide_index: int,
+    shape_id: Optional[int] = None,
+    shape_index: Optional[int] = None,
+    row_indices: Optional[List[int]] = None,
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """平均列高（POST /ppt/distribute_table_row_heights）。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+        "row_indices": row_indices,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/distribute_table_row_heights", json_body=body)
+
+
+@mcp.tool()
+async def delete_table(
+    file_path: str,
+    slide_index: int,
+    shape_id: Optional[int] = None,
+    shape_index: Optional[int] = None,
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """刪除整個表格（POST /ppt/delete_table）。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/delete_table", json_body=body)
+
+
+@mcp.tool()
+async def set_table_row_height(
+    file_path: str,
+    slide_index: int,
+    row_idx: int,
+    height_emu: int,
+    shape_id: Optional[int] = None,
+    shape_index: Optional[int] = None,
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """設定列高（POST /ppt/set_table_row_height）。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "row_idx": row_idx,
+        "height_emu": height_emu,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/set_table_row_height", json_body=body)
+
+
+@mcp.tool()
+async def set_table_column_width(
+    file_path: str,
+    slide_index: int,
+    col_idx: int,
+    width_emu: int,
+    shape_id: Optional[int] = None,
+    shape_index: Optional[int] = None,
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """設定欄寬（POST /ppt/set_table_column_width）。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "col_idx": col_idx,
+        "width_emu": width_emu,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/set_table_column_width", json_body=body)
+
+
+@mcp.tool()
+async def rebuild_table_structure(
+    file_path: str,
+    slide_index: int,
+    new_rows: int,
+    new_cols: int,
+    shape_id: Optional[int] = None,
+    shape_index: Optional[int] = None,
+    first_row_as_header: bool = False,
+    font_size: int = 14,
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """重建表格列欄數（POST /ppt/rebuild_table_structure）。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "new_rows": new_rows,
+        "new_cols": new_cols,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+        "first_row_as_header": first_row_as_header,
+        "font_size": font_size,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/rebuild_table_structure", json_body=body)
+
+
+@mcp.tool()
+async def insert_table_row(
+    file_path: str,
+    slide_index: int,
+    insert_before: int,
+    shape_id: Optional[int] = None,
+    shape_index: Optional[int] = None,
+    first_row_as_header: bool = False,
+    font_size: int = 14,
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """插入列（POST /ppt/insert_table_row）。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "insert_before": insert_before,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+        "first_row_as_header": first_row_as_header,
+        "font_size": font_size,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/insert_table_row", json_body=body)
+
+
+@mcp.tool()
+async def delete_table_row(
+    file_path: str,
+    slide_index: int,
+    row_idx: int,
+    shape_id: Optional[int] = None,
+    shape_index: Optional[int] = None,
+    first_row_as_header: bool = False,
+    font_size: int = 14,
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """刪除列（POST /ppt/delete_table_row）。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "row_idx": row_idx,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+        "first_row_as_header": first_row_as_header,
+        "font_size": font_size,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/delete_table_row", json_body=body)
+
+
+@mcp.tool()
+async def insert_table_column(
+    file_path: str,
+    slide_index: int,
+    insert_before: int,
+    shape_id: Optional[int] = None,
+    shape_index: Optional[int] = None,
+    first_row_as_header: bool = False,
+    font_size: int = 14,
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """插入欄（POST /ppt/insert_table_column）。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "insert_before": insert_before,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+        "first_row_as_header": first_row_as_header,
+        "font_size": font_size,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/insert_table_column", json_body=body)
+
+
+@mcp.tool()
+async def delete_table_column(
+    file_path: str,
+    slide_index: int,
+    col_idx: int,
+    shape_id: Optional[int] = None,
+    shape_index: Optional[int] = None,
+    first_row_as_header: bool = False,
+    font_size: int = 14,
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """刪除欄（POST /ppt/delete_table_column）。"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "col_idx": col_idx,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+        "first_row_as_header": first_row_as_header,
+        "font_size": font_size,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/delete_table_column", json_body=body)
 
 
 @mcp.tool()
@@ -287,7 +913,7 @@ async def add_shape(
     font_color: Optional[List[int]] = None,
     save_as: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """在指定投影片加入一般圖形，例如 rect / ellipse / diamond。"""
+    """新增形狀圖案"""
     body: Dict[str, Any] = {
         "file_path": file_path,
         "slide_index": slide_index,
@@ -322,7 +948,7 @@ async def add_line(
     line_width: Optional[int] = None,
     save_as: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """在指定投影片加入直線。"""
+    """增加線段"""
     body: Dict[str, Any] = {
         "file_path": file_path,
         "slide_index": slide_index,
@@ -357,7 +983,7 @@ async def add_arrow(
     font_color: Optional[List[int]] = None,
     save_as: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """在指定投影片加入箭頭圖形。"""
+    """新增箭頭"""
     body: Dict[str, Any] = {
         "file_path": file_path,
         "slide_index": slide_index,
@@ -382,7 +1008,7 @@ async def add_arrow(
 
 @mcp.tool()
 async def delete_slide(file_path: str, slide_index: int, save_as: Optional[str] = None) -> Dict[str, Any]:
-    """刪除指定投影片。"""
+    """刪除投影片"""
     body: Dict[str, Any] = {"file_path": file_path, "slide_index": slide_index}
     if save_as:
         body["save_as"] = save_as
@@ -391,7 +1017,7 @@ async def delete_slide(file_path: str, slide_index: int, save_as: Optional[str] 
 
 @mcp.tool()
 async def duplicate_slide(file_path: str, slide_index: int, save_as: Optional[str] = None) -> Dict[str, Any]:
-    """複製指定投影片。"""
+    """複製投影片"""
     body: Dict[str, Any] = {"file_path": file_path, "slide_index": slide_index}
     if save_as:
         body["save_as"] = save_as
@@ -408,7 +1034,7 @@ async def replace_text(
     case_sensitive: bool = True,
     save_as: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """在整份或指定投影片中取代文字。"""
+    """替換文字"""
     body: Dict[str, Any] = {
         "file_path": file_path,
         "old_text": old_text,
@@ -438,7 +1064,7 @@ async def add_bullets(
     font_color: Optional[List[int]] = None,
     save_as: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """在指定投影片加入項目符號清單。"""
+    """新增列表"""
     body: Dict[str, Any] = {
         "file_path": file_path,
         "slide_index": slide_index,
@@ -460,7 +1086,7 @@ async def add_bullets(
 
 @mcp.tool()
 async def add_title_slide(file_path: str, title: str, subtitle: str = "", save_as: Optional[str] = None) -> Dict[str, Any]:
-    """新增標題頁。"""
+    """新增標題頁"""
     body: Dict[str, Any] = {
         "file_path": file_path,
         "title": title,
@@ -473,7 +1099,7 @@ async def add_title_slide(file_path: str, title: str, subtitle: str = "", save_a
 
 @mcp.tool()
 async def reorder_slides(file_path: str, new_order: List[int], save_as: Optional[str] = None) -> Dict[str, Any]:
-    """重新排列投影片順序。"""
+    """重新排序投影片"""
     body: Dict[str, Any] = {"file_path": file_path, "new_order": new_order}
     if save_as:
         body["save_as"] = save_as
@@ -487,7 +1113,7 @@ async def set_slide_background_color(
     rgb: List[int],
     save_as: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """設定單頁背景顏色。"""
+    """設定投影片背景顏色"""
     body: Dict[str, Any] = {
         "file_path": file_path,
         "slide_index": slide_index,
@@ -505,7 +1131,7 @@ async def set_slide_background_image(
     image_path: str,
     save_as: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """設定單頁背景圖片。"""
+    """設定投影片背景圖片"""
     body: Dict[str, Any] = {
         "file_path": file_path,
         "slide_index": slide_index,
@@ -523,7 +1149,7 @@ async def set_slides_background_color(
     rgb: List[int],
     save_as: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """設定多頁背景顏色。"""
+    """設定多張投影片背景顏色"""
     body: Dict[str, Any] = {
         "file_path": file_path,
         "slide_indices": slide_indices,
@@ -541,7 +1167,7 @@ async def set_slides_background_image(
     image_path: str,
     save_as: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """設定多頁背景圖片。"""
+    """設定多張投影片背景圖片"""
     body: Dict[str, Any] = {
         "file_path": file_path,
         "slide_indices": slide_indices,
@@ -555,8 +1181,7 @@ async def set_slides_background_image(
 @mcp.tool()
 async def ppt_theme_info(file_path: str) -> Dict[str, Any]:
     """
-    呼叫 GET /ppt/theme_info，讀取 PPTX 佈景主題（theme）、色彩配置、字型配置等摘要。
-    需先啟動 api_server；底層邏輯由 ppt_stdio.get_presentation_theme_info 提供。
+    獲取PPTX主題信息
     """
     return await _request("GET", "/ppt/theme_info", params={"file_path": file_path})
 
@@ -564,7 +1189,7 @@ async def ppt_theme_info(file_path: str) -> Dict[str, Any]:
 @mcp.tool()
 async def ppt_slide_background(file_path: str, slide_index: int = 0) -> Dict[str, Any]:
     """
-    呼叫 GET /ppt/slide_background，讀取指定頁之背景類型（繼承母片、純色、圖片、滿版圖片模擬等）。
+    獲取投影片背景
     """
     return await _request(
         "GET",
@@ -576,7 +1201,7 @@ async def ppt_slide_background(file_path: str, slide_index: int = 0) -> Dict[str
 @mcp.tool()
 async def ppt_slides_backgrounds(file_path: str) -> Dict[str, Any]:
     """
-    呼叫 GET /ppt/slides_backgrounds，一次掃描整份簡報各頁背景並附帶 theme 摘要。
+    獲取多張投影片背景
     """
     return await _request("GET", "/ppt/slides_backgrounds", params={"file_path": file_path})
 
@@ -588,7 +1213,7 @@ async def ppt_textbox_style(
     shape_id: Optional[int] = None,
     shape_index: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """讀取指定文字框的底色、透明度、邊框樣式、邊框顏色。"""
+    """獲取文本框樣式"""
     return await _request(
         "GET",
         "/ppt/textbox_style",
@@ -603,7 +1228,7 @@ async def ppt_textbox_style(
 
 @mcp.tool()
 async def ppt_slide_textbox_styles(file_path: str, slide_index: int = 0) -> Dict[str, Any]:
-    """列出指定頁全部文字框的樣式資訊。"""
+    """獲取投影片文本框樣式"""
     return await _request(
         "GET",
         "/ppt/slide_textbox_styles",
@@ -624,7 +1249,7 @@ async def set_textbox_style(
     line_width: Optional[int] = None,
     save_as: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """更新文字框底色、透明度、邊框樣式、邊框顏色與邊框寬度。"""
+    """設定文本框樣式"""
     body: Dict[str, Any] = {
         "file_path": file_path,
         "slide_index": slide_index,
@@ -654,7 +1279,7 @@ async def drag_shape(
     height: Optional[int] = None,
     save_as: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """拖拉任意 shape（圖片、一般圖形、文字框），支援 left/top 絕對定位或 delta_x/delta_y 相對位移。"""
+    """拖動形狀"""
     body: Dict[str, Any] = {
         "file_path": file_path,
         "slide_index": slide_index,
@@ -685,7 +1310,7 @@ async def drag_textbox(
     height: Optional[int] = None,
     save_as: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """拖拉指定文字框位置（可用絕對 left/top 或相對 delta_x/delta_y，並可選調整寬高）。"""
+    """拖動文本框"""
     body: Dict[str, Any] = {
         "file_path": file_path,
         "slide_index": slide_index,
@@ -710,7 +1335,7 @@ async def delete_textbox(
     shape_index: Optional[int] = None,
     save_as: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """刪除指定文字框（可用 shape_id 或 shape_index 定位）。"""
+    """刪除文本框"""
     body: Dict[str, Any] = {
         "file_path": file_path,
         "slide_index": slide_index,
@@ -737,7 +1362,7 @@ async def add_wordart_like_textbox(
         align: str = "center",
         save_as: Optional[str] = None,
     ) -> Dict[str, Any]:
-    """在指定頁以文字框模擬 WordArt 風格（對應 POST /ppt/add_wordart_like_textbox）。"""
+    """新增WordArt文本框"""
     body: Dict[str, Any] = {
         "file_path": file_path,
         "slide_index": slide_index,
@@ -767,7 +1392,7 @@ async def update_wordart_text(
         shape_index: Optional[int] = None,
         save_as: Optional[str] = None,
     ) -> Dict[str, Any]:
-    """更新命名或指定 id/index 的 WordArt 類文字（對應 POST /ppt/update_wordart_text）。"""
+    """更新WordArt文本框文字"""
     body: Dict[str, Any] = {
         "file_path": file_path,
         "slide_index": slide_index,
@@ -789,7 +1414,7 @@ async def delete_shape(
         shape_index: Optional[int] = None,
         save_as: Optional[str] = None,
     ) -> Dict[str, Any]:
-    """刪除指定頁上的任意 shape（對應 POST /ppt/delete_shape）。"""
+    """刪除形狀"""
     body: Dict[str, Any] = {
         "file_path": file_path,
         "slide_index": slide_index,
@@ -811,7 +1436,7 @@ async def clone_named_shape_from_template(
         top: Optional[int] = None,
         save_as: Optional[str] = None,
     ) -> Dict[str, Any]:
-    """依 shape 名稱從同頁複製範本並可選填新文字（對應 POST /ppt/clone_named_shape_from_template）。"""
+    """從模板複製形狀"""
     body: Dict[str, Any] = {
         "file_path": file_path,
         "slide_index": slide_index,
@@ -827,7 +1452,7 @@ async def clone_named_shape_from_template(
 
 @mcp.tool()
 async def parse_math_expression(input_text: str, input_type: str = "latex") -> Dict[str, Any]:
-    """解析口語或 LaTeX（POST /ppt/parse_math_expression），不修改簡報檔。"""
+    """解析數學公式"""
     return await _request(
         "POST",
         "/ppt/parse_math_expression",
@@ -852,7 +1477,7 @@ async def add_equation(
         render_mode: str = "omml",
         save_as: Optional[str] = None,
     ) -> Dict[str, Any]:
-    """新增數學式：預設 B（OMML，POST /ppt/add_equation）；render_mode=image 為 M1 圖片。"""
+    """新增數學公式"""
     body: Dict[str, Any] = {
         "file_path": file_path,
         "slide_index": slide_index,
@@ -886,7 +1511,7 @@ async def update_equation(
         render_mode: str = "omml",
         save_as: Optional[str] = None,
     ) -> Dict[str, Any]:
-    """更新數學式：預設 B（OMML）；render_mode=image 為圖片方程式。"""
+    """更新數學公式"""
     body: Dict[str, Any] = {
         "file_path": file_path,
         "input_text": input_text,
@@ -912,7 +1537,7 @@ async def delete_equation(
         render_mode: str = "omml",
         save_as: Optional[str] = None,
     ) -> Dict[str, Any]:
-    """刪除數學式：預設 B（OMML）；render_mode=image 為圖片方程式。"""
+    """刪除數學公式"""
     body: Dict[str, Any] = {
         "file_path": file_path,
         "expr_id": expr_id,
@@ -933,7 +1558,7 @@ async def render_slide_to_image(
     dpi: int = 150,
     libreoffice_path: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """把指定投影片輸出成單張圖片。"""
+    """渲染投影片為圖片"""
     return await _request(
         "POST",
         "/ppt/render_slide_to_image",
@@ -958,7 +1583,7 @@ async def render_slides_to_grid_image(
     add_page_title: bool = True,
     figure_title: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """把多頁投影片輸出成 grid 拼圖。"""
+    """渲染多張投影片為圖片"""
     return await _request(
         "POST",
         "/ppt/render_slides_to_grid_image",
@@ -977,7 +1602,7 @@ async def render_slides_to_grid_image(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="MCP server for PPT FastAPI backend")
-    parser.add_argument("--api-base", default=DEFAULT_API_BASE, help="底層 PPT API base URL，例如 http://10.1.3.127:6414")
+    parser.add_argument("--api-base", default=DEFAULT_API_BASE, help="PPT API base URL, default: http://10.1.3.127:6414")
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT, help="HTTP timeout seconds")
     parser.add_argument(
         "--transport",
@@ -985,9 +1610,9 @@ def main() -> None:
         choices=["stdio", "streamable-http", "sse"],
         help="MCP transport",
     )
-    parser.add_argument("--host", default="10.1.3.127", help="streamable-http / sse 綁定 host")
-    parser.add_argument("--port", type=int, default=6414, help="streamable-http / sse 綁定 port")
-    parser.add_argument("--path", default="/mcp", help="streamable-http 路徑")
+    parser.add_argument("--host", default="10.1.3.127", help="streamable-http / sse host, default: 10.1.3.127")
+    parser.add_argument("--port", type=int, default=6414, help="streamable-http / sse port, default: 6414")
+    parser.add_argument("--path", default="/mcp", help="streamable-http path, default: /mcp")
     args = parser.parse_args()
 
     set_runtime_config(args.api_base, args.timeout)
@@ -1002,3 +1627,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

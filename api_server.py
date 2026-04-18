@@ -21,6 +21,11 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 import dataProcess.ppt_stdio as ppt_stdio_mod
+try:
+    from dataProcess.file_importers import FileImportManager
+except Exception:
+    FileImportManager = None
+
 from dataProcess.ppt_stdio import (
     new,
     open_presentation,
@@ -32,6 +37,24 @@ from dataProcess.ppt_stdio import (
     update_wordart_text,
     add_image,
     add_table,
+    list_slide_tables,
+    get_table_detail,
+    update_table_cell,
+    set_table_cell_style,
+    update_table_row,
+    update_table_column,
+    set_table_row_style,
+    set_table_column_style,
+    set_table_row_height,
+    set_table_column_width,
+    distribute_table_column_widths,
+    distribute_table_row_heights,
+    delete_table,
+    rebuild_table_with_modified_structure,
+    insert_table_row,
+    delete_table_row,
+    insert_table_column,
+    delete_table_column,
     add_line,
     add_arrow,
     add_shape,
@@ -85,6 +108,8 @@ if not logging.getLogger().handlers:
     logging.basicConfig(level=_LOG_LEVEL)
 logger.setLevel(_LOG_LEVEL)
 logger.info("Loaded ppt_stdio module: %s", getattr(ppt_stdio_mod, "__file__", "<unknown>"))
+
+_file_import_manager = FileImportManager() if FileImportManager is not None else None
 
 
 def _load_server_config() -> Dict[str, Any]:
@@ -185,6 +210,155 @@ class AddTableRequest(BaseModel):
     first_row_as_header: bool = False
     font_size: int = Field(14, gt=0)
     save_as: Optional[str] = None
+
+
+class _TableShapeLocator(BaseModel):
+    file_path: str
+    slide_index: int = Field(..., ge=0)
+    shape_id: Optional[int] = None
+    shape_index: Optional[int] = Field(None, ge=0)
+    save_as: Optional[str] = None
+
+
+class UpdateTableCellRequest(_TableShapeLocator):
+    row_idx: int = Field(..., ge=0)
+    col_idx: int = Field(..., ge=0)
+    text: Optional[str] = None
+    font_name: Optional[str] = None
+    font_size: Optional[int] = Field(None, gt=0)
+    bold: Optional[bool] = None
+    italic: Optional[bool] = None
+    font_color: Optional[List[int]] = None
+    fill_color: Optional[List[int]] = None
+    h_align: Optional[str] = None
+    v_align: Optional[str] = None
+    border_color: Optional[List[int]] = None
+    border_width: Optional[float] = None
+    border_style: Optional[str] = None
+    clear_text: bool = False
+
+
+class SetTableCellStyleRequest(_TableShapeLocator):
+    row_idx: int = Field(..., ge=0)
+    col_idx: int = Field(..., ge=0)
+    font_name: Optional[str] = None
+    font_size: Optional[int] = Field(None, gt=0)
+    bold: Optional[bool] = None
+    italic: Optional[bool] = None
+    font_color: Optional[List[int]] = None
+    fill_color: Optional[List[int]] = None
+    h_align: Optional[str] = None
+    v_align: Optional[str] = None
+    border_color: Optional[List[int]] = None
+    border_width: Optional[float] = None
+    border_style: Optional[str] = None
+
+
+class UpdateTableRowRequest(_TableShapeLocator):
+    row_idx: int = Field(..., ge=0)
+    row_text: Optional[str] = None
+    cell_texts: Optional[List[str]] = None
+    font_name: Optional[str] = None
+    font_size: Optional[int] = Field(None, gt=0)
+    bold: Optional[bool] = None
+    italic: Optional[bool] = None
+    font_color: Optional[List[int]] = None
+    fill_color: Optional[List[int]] = None
+    h_align: Optional[str] = None
+    v_align: Optional[str] = None
+
+
+class UpdateTableColumnRequest(_TableShapeLocator):
+    col_idx: int = Field(..., ge=0)
+    column_text: Optional[str] = None
+    cell_texts: Optional[List[str]] = None
+    font_name: Optional[str] = None
+    font_size: Optional[int] = Field(None, gt=0)
+    bold: Optional[bool] = None
+    italic: Optional[bool] = None
+    font_color: Optional[List[int]] = None
+    fill_color: Optional[List[int]] = None
+    h_align: Optional[str] = None
+    v_align: Optional[str] = None
+
+
+class SetTableRowStyleRequest(_TableShapeLocator):
+    row_idx: int = Field(..., ge=0)
+    font_name: Optional[str] = None
+    font_size: Optional[int] = Field(None, gt=0)
+    bold: Optional[bool] = None
+    italic: Optional[bool] = None
+    font_color: Optional[List[int]] = None
+    fill_color: Optional[List[int]] = None
+    h_align: Optional[str] = None
+    v_align: Optional[str] = None
+    border_color: Optional[List[int]] = None
+    border_width: Optional[float] = None
+    border_style: Optional[str] = None
+
+
+class SetTableColumnStyleRequest(_TableShapeLocator):
+    col_idx: int = Field(..., ge=0)
+    font_name: Optional[str] = None
+    font_size: Optional[int] = Field(None, gt=0)
+    bold: Optional[bool] = None
+    italic: Optional[bool] = None
+    font_color: Optional[List[int]] = None
+    fill_color: Optional[List[int]] = None
+    h_align: Optional[str] = None
+    v_align: Optional[str] = None
+    border_color: Optional[List[int]] = None
+    border_width: Optional[float] = None
+    border_style: Optional[str] = None
+
+
+class SetTableRowHeightRequest(_TableShapeLocator):
+    row_idx: int = Field(..., ge=0)
+    height_emu: int = Field(..., gt=0)
+
+
+class SetTableColumnWidthRequest(_TableShapeLocator):
+    col_idx: int = Field(..., ge=0)
+    width_emu: int = Field(..., gt=0)
+
+
+class DistributeTableColumnWidthsRequest(_TableShapeLocator):
+    column_indices: Optional[List[int]] = None
+
+
+class DistributeTableRowHeightsRequest(_TableShapeLocator):
+    row_indices: Optional[List[int]] = None
+
+
+class RebuildTableStructureRequest(_TableShapeLocator):
+    new_rows: int = Field(..., ge=1)
+    new_cols: int = Field(..., ge=1)
+    first_row_as_header: bool = False
+    font_size: int = Field(14, gt=0)
+
+
+class InsertTableRowRequest(_TableShapeLocator):
+    insert_before: int = Field(..., ge=0)
+    first_row_as_header: bool = False
+    font_size: int = Field(14, gt=0)
+
+
+class DeleteTableRowRequest(_TableShapeLocator):
+    row_idx: int = Field(..., ge=0)
+    first_row_as_header: bool = False
+    font_size: int = Field(14, gt=0)
+
+
+class InsertTableColumnRequest(_TableShapeLocator):
+    insert_before: int = Field(..., ge=0)
+    first_row_as_header: bool = False
+    font_size: int = Field(14, gt=0)
+
+
+class DeleteTableColumnRequest(_TableShapeLocator):
+    col_idx: int = Field(..., ge=0)
+    first_row_as_header: bool = False
+    font_size: int = Field(14, gt=0)
 
 
 class DeleteSlideRequest(BaseModel):
@@ -464,6 +638,50 @@ class RenderSlidesToGridImageRequest(BaseModel):
     figure_title: Optional[str] = None
 
 
+class ImportFileRequest(BaseModel):
+    file_path: str
+    file_type: Optional[str] = None
+    options: Optional[Dict[str, Any]] = None
+
+
+class ProcessFileRequest(BaseModel):
+    file_path: str
+    filename: Optional[str] = None
+    options: Optional[Dict[str, Any]] = None
+
+
+class RunStageExtractRequest(BaseModel):
+    local_path: str
+    filename: Optional[str] = None
+    config: Optional[Dict[str, Any]] = None
+
+
+class RunStageSegmentRequest(BaseModel):
+    import_result: Dict[str, Any]
+    options: Optional[Dict[str, Any]] = None
+
+
+class RunStageChunkRequest(BaseModel):
+    segment_result: Dict[str, Any]
+    options: Optional[Dict[str, Any]] = None
+
+
+class RunParserPipelineRequest(BaseModel):
+    file_path: str
+    file_type: Optional[str] = None
+    import_options: Optional[Dict[str, Any]] = None
+    segment_options: Optional[Dict[str, Any]] = None
+    chunk_options: Optional[Dict[str, Any]] = None
+
+
+def _tuple3_opt(v: Optional[List[int]]) -> Optional[tuple]:
+    if v is None:
+        return None
+    if len(v) != 3:
+        raise ValueError("RGB 必須為長度 3 的整數陣列")
+    return (int(v[0]), int(v[1]), int(v[2]))
+
+
 def _ok(data: Any = None, message: str = "success") -> Dict[str, Any]:
     return {
         "ok": True,
@@ -494,6 +712,12 @@ def _serialize_runs(runs: Optional[List[EquationTextRun]]) -> Optional[List[Dict
     return result
 
 
+def _get_file_import_manager() -> Any:
+    if _file_import_manager is None:
+        raise RuntimeError("file_importers is not available in this environment")
+    return _file_import_manager
+
+
 # -------------------------
 # Health
 # -------------------------
@@ -509,6 +733,122 @@ def root():
 @app.get("/health")
 def health():
     return _ok({"status": "healthy"})
+
+
+# -------------------------
+# Context Parser / File Importers
+# -------------------------
+
+@app.post("/ppt/import_file")
+def ppt_import_file(req: ImportFileRequest):
+    try:
+        manager = _get_file_import_manager()
+        options = req.options or {}
+        result = manager.import_file(
+            file_path=req.file_path,
+            file_type=req.file_type,
+            **options,
+        )
+        return _ok(result, message="import_file completed")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/process_file")
+def ppt_process_file(req: ProcessFileRequest):
+    try:
+        manager = _get_file_import_manager()
+        options = req.options or {}
+        ret: Dict[str, Any] = {}
+        ok = manager.process_file(
+            ret=ret,
+            local_path=req.file_path,
+            filename=req.filename,
+            **options,
+        )
+        if not ok:
+            raise RuntimeError(ret.get("error", "process_file failed"))
+        return _ok(ret, message="process_file completed")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/run_stage_extract")
+def ppt_run_stage_extract(req: RunStageExtractRequest):
+    try:
+        manager = _get_file_import_manager()
+        result = manager.run_stage_extract(
+            local_path=req.local_path,
+            filename=req.filename,
+            config=req.config,
+        )
+        if not result.get("success", False):
+            raise RuntimeError(result.get("error", "run_stage_extract failed"))
+        return _ok(result, message="run_stage_extract completed")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/run_stage_segment")
+def ppt_run_stage_segment(req: RunStageSegmentRequest):
+    try:
+        manager = _get_file_import_manager()
+        options = req.options or {}
+        result = manager.run_stage_segment(req.import_result, **options)
+        if not result.get("success", False):
+            raise RuntimeError(result.get("error", "run_stage_segment failed"))
+        return _ok(result, message="run_stage_segment completed")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/run_stage_chunk")
+def ppt_run_stage_chunk(req: RunStageChunkRequest):
+    try:
+        manager = _get_file_import_manager()
+        options = req.options or {}
+        result = manager.run_stage_chunk(req.segment_result, **options)
+        if not result.get("success", False):
+            raise RuntimeError(result.get("error", "run_stage_chunk failed"))
+        return _ok(result, message="run_stage_chunk completed")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/run_parser_pipeline")
+def ppt_run_parser_pipeline(req: RunParserPipelineRequest):
+    try:
+        manager = _get_file_import_manager()
+        import_options = req.import_options or {}
+        segment_options = req.segment_options or {}
+        chunk_options = req.chunk_options or {}
+
+        import_result = manager.import_file(
+            file_path=req.file_path,
+            file_type=req.file_type,
+            **import_options,
+        )
+        if not import_result.get("success", False):
+            raise RuntimeError(import_result.get("error", "import_file failed"))
+
+        segment_result = manager.run_stage_segment(import_result, **segment_options)
+        if not segment_result.get("success", False):
+            raise RuntimeError(segment_result.get("error", "run_stage_segment failed"))
+
+        chunk_result = manager.run_stage_chunk(segment_result, **chunk_options)
+        if not chunk_result.get("success", False):
+            raise RuntimeError(chunk_result.get("error", "run_stage_chunk failed"))
+
+        return _ok(
+            {
+                "import_result": import_result,
+                "segment_result": segment_result,
+                "chunk_result": chunk_result,
+            },
+            message="run_parser_pipeline completed",
+        )
+    except Exception as e:
+        _err_to_http(e)
 
 
 # -------------------------
@@ -958,6 +1298,371 @@ def ppt_add_table(req: AddTableRequest):
             "result": result,
             "info": get_info(doc),
         }, message="新增表格成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.get("/ppt/slide_tables")
+def ppt_slide_tables(file_path: str, slide_index: int = 0):
+    try:
+        doc = open_presentation(file_path)
+        return _ok(list_slide_tables(doc, slide_index))
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.get("/ppt/table_detail")
+def ppt_table_detail(file_path: str, slide_index: int, shape_id: Optional[int] = None, shape_index: Optional[int] = None):
+    try:
+        doc = open_presentation(file_path)
+        return _ok(get_table_detail(doc, slide_index, shape_id=shape_id, shape_index=shape_index))
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/update_table_cell")
+def ppt_update_table_cell(req: UpdateTableCellRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = update_table_cell(
+            doc,
+            req.slide_index,
+            req.row_idx,
+            req.col_idx,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+            text=req.text,
+            font_name=req.font_name,
+            font_size=req.font_size,
+            bold=req.bold,
+            italic=req.italic,
+            font_color=_tuple3_opt(req.font_color),
+            fill_color=_tuple3_opt(req.fill_color),
+            h_align=req.h_align,
+            v_align=req.v_align,
+            border_color=_tuple3_opt(req.border_color),
+            border_width=req.border_width,
+            border_style=req.border_style,
+            clear_text=req.clear_text,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({"file_path": out_path, "result": result, "info": get_info(doc)}, message="更新儲存格成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/set_table_cell_style")
+def ppt_set_table_cell_style(req: SetTableCellStyleRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = set_table_cell_style(
+            doc,
+            req.slide_index,
+            req.row_idx,
+            req.col_idx,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+            font_name=req.font_name,
+            font_size=req.font_size,
+            bold=req.bold,
+            italic=req.italic,
+            font_color=_tuple3_opt(req.font_color),
+            fill_color=_tuple3_opt(req.fill_color),
+            h_align=req.h_align,
+            v_align=req.v_align,
+            border_color=_tuple3_opt(req.border_color),
+            border_width=req.border_width,
+            border_style=req.border_style,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({"file_path": out_path, "result": result, "info": get_info(doc)}, message="設定儲存格樣式成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/update_table_row")
+def ppt_update_table_row(req: UpdateTableRowRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = update_table_row(
+            doc,
+            req.slide_index,
+            req.row_idx,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+            row_text=req.row_text,
+            cell_texts=req.cell_texts,
+            font_name=req.font_name,
+            font_size=req.font_size,
+            bold=req.bold,
+            italic=req.italic,
+            font_color=_tuple3_opt(req.font_color),
+            fill_color=_tuple3_opt(req.fill_color),
+            h_align=req.h_align,
+            v_align=req.v_align,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({"file_path": out_path, "result": result, "info": get_info(doc)}, message="更新整列成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/update_table_column")
+def ppt_update_table_column(req: UpdateTableColumnRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = update_table_column(
+            doc,
+            req.slide_index,
+            req.col_idx,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+            column_text=req.column_text,
+            cell_texts=req.cell_texts,
+            font_name=req.font_name,
+            font_size=req.font_size,
+            bold=req.bold,
+            italic=req.italic,
+            font_color=_tuple3_opt(req.font_color),
+            fill_color=_tuple3_opt(req.fill_color),
+            h_align=req.h_align,
+            v_align=req.v_align,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({"file_path": out_path, "result": result, "info": get_info(doc)}, message="更新整欄成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/set_table_row_style")
+def ppt_set_table_row_style(req: SetTableRowStyleRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = set_table_row_style(
+            doc,
+            req.slide_index,
+            req.row_idx,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+            font_name=req.font_name,
+            font_size=req.font_size,
+            bold=req.bold,
+            italic=req.italic,
+            font_color=_tuple3_opt(req.font_color),
+            fill_color=_tuple3_opt(req.fill_color),
+            h_align=req.h_align,
+            v_align=req.v_align,
+            border_color=_tuple3_opt(req.border_color),
+            border_width=req.border_width,
+            border_style=req.border_style,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({"file_path": out_path, "result": result, "info": get_info(doc)}, message="設定整列樣式成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/set_table_column_style")
+def ppt_set_table_column_style(req: SetTableColumnStyleRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = set_table_column_style(
+            doc,
+            req.slide_index,
+            req.col_idx,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+            font_name=req.font_name,
+            font_size=req.font_size,
+            bold=req.bold,
+            italic=req.italic,
+            font_color=_tuple3_opt(req.font_color),
+            fill_color=_tuple3_opt(req.fill_color),
+            h_align=req.h_align,
+            v_align=req.v_align,
+            border_color=_tuple3_opt(req.border_color),
+            border_width=req.border_width,
+            border_style=req.border_style,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({"file_path": out_path, "result": result, "info": get_info(doc)}, message="設定整欄樣式成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/set_table_row_height")
+def ppt_set_table_row_height(req: SetTableRowHeightRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = set_table_row_height(
+            doc,
+            req.slide_index,
+            req.row_idx,
+            req.height_emu,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({"file_path": out_path, "result": result, "info": get_info(doc)}, message="設定列高成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/set_table_column_width")
+def ppt_set_table_column_width(req: SetTableColumnWidthRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = set_table_column_width(
+            doc,
+            req.slide_index,
+            req.col_idx,
+            req.width_emu,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({"file_path": out_path, "result": result, "info": get_info(doc)}, message="設定欄寬成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/distribute_table_column_widths")
+def ppt_distribute_table_column_widths(req: DistributeTableColumnWidthsRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = distribute_table_column_widths(
+            doc,
+            req.slide_index,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+            column_indices=req.column_indices,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({"file_path": out_path, "result": result, "info": get_info(doc)}, message="平均欄寬成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/distribute_table_row_heights")
+def ppt_distribute_table_row_heights(req: DistributeTableRowHeightsRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = distribute_table_row_heights(
+            doc,
+            req.slide_index,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+            row_indices=req.row_indices,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({"file_path": out_path, "result": result, "info": get_info(doc)}, message="平均列高成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/delete_table")
+def ppt_delete_table(req: _TableShapeLocator):
+    try:
+        doc = open_presentation(req.file_path)
+        result = delete_table(doc, req.slide_index, shape_id=req.shape_id, shape_index=req.shape_index)
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({"file_path": out_path, "result": result, "info": get_info(doc)}, message="刪除表格成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/rebuild_table_structure")
+def ppt_rebuild_table_structure(req: RebuildTableStructureRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = rebuild_table_with_modified_structure(
+            doc,
+            req.slide_index,
+            req.new_rows,
+            req.new_cols,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+            first_row_as_header=req.first_row_as_header,
+            font_size=req.font_size,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({"file_path": out_path, "result": result, "info": get_info(doc)}, message="重建表格成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/insert_table_row")
+def ppt_insert_table_row(req: InsertTableRowRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = insert_table_row(
+            doc,
+            req.slide_index,
+            req.insert_before,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+            first_row_as_header=req.first_row_as_header,
+            font_size=req.font_size,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({"file_path": out_path, "result": result, "info": get_info(doc)}, message="插入列成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/delete_table_row")
+def ppt_delete_table_row(req: DeleteTableRowRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = delete_table_row(
+            doc,
+            req.slide_index,
+            req.row_idx,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+            first_row_as_header=req.first_row_as_header,
+            font_size=req.font_size,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({"file_path": out_path, "result": result, "info": get_info(doc)}, message="刪除列成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/insert_table_column")
+def ppt_insert_table_column(req: InsertTableColumnRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = insert_table_column(
+            doc,
+            req.slide_index,
+            req.insert_before,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+            first_row_as_header=req.first_row_as_header,
+            font_size=req.font_size,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({"file_path": out_path, "result": result, "info": get_info(doc)}, message="插入欄成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/delete_table_column")
+def ppt_delete_table_column(req: DeleteTableColumnRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = delete_table_column(
+            doc,
+            req.slide_index,
+            req.col_idx,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+            first_row_as_header=req.first_row_as_header,
+            font_size=req.font_size,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({"file_path": out_path, "result": result, "info": get_info(doc)}, message="刪除欄成功")
     except Exception as e:
         _err_to_http(e)
 
