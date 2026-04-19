@@ -173,10 +173,33 @@ def _contains_cjk(text: str) -> bool:
     return False
 
 
+_ZH_FONT_FALLBACKS = [
+    "微軟正黑體",
+    "Microsoft JhengHei",
+    "PingFang TC",
+    "Noto Sans CJK TC",
+    "SimHei",
+]
+
+
+def _first_available_zh_font() -> str:
+    try:
+        if PYTHON_PPTX_EXTRA_AVAILABLE:
+            available = {f.name for f in font_manager.fontManager.ttflist}
+            for candidate in _ZH_FONT_FALLBACKS:
+                if candidate in available:
+                    return candidate
+    except Exception:
+        pass
+    return DEFAULT_FONT_ZH
+
+
 def _get_default_fonts() -> Tuple[str, str]:
     config = _load_pptstudio_config()
     fonts_config = config.get("fonts", {}) if isinstance(config, dict) else {}
-    zh_font = str(fonts_config.get("default_zh", DEFAULT_FONT_ZH)).strip() or DEFAULT_FONT_ZH
+    zh_font = str(fonts_config.get("default_zh", "")).strip()
+    if not zh_font:
+        zh_font = _first_available_zh_font()
     en_font = str(fonts_config.get("default_en", DEFAULT_FONT_EN)).strip() or DEFAULT_FONT_EN
     return zh_font, en_font
 

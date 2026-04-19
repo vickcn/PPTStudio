@@ -17,6 +17,7 @@
 tmp*
 *pyc*
 *.zip
+dataP**
 
 *analysis_result*.json
 *timer*.json
