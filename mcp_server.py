@@ -1161,6 +1161,22 @@ async def set_slides_background_color(
 
 
 @mcp.tool()
+async def set_all_slides_background_color(
+    file_path: str,
+    rgb: List[int],
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """套用全部投影片背景顏色"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "rgb": _clean_rgb(rgb),
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/set_all_slides_background_color", json_body=body)
+
+
+@mcp.tool()
 async def set_slides_background_image(
     file_path: str,
     slide_indices: List[int],
@@ -1176,6 +1192,22 @@ async def set_slides_background_image(
     if save_as:
         body["save_as"] = save_as
     return await _request("POST", "/ppt/set_slides_background_image", json_body=body)
+
+
+@mcp.tool()
+async def set_all_slides_background_image(
+    file_path: str,
+    image_path: str,
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """套用全部投影片背景圖片"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "image_path": image_path,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/set_all_slides_background_image", json_body=body)
 
 
 @mcp.tool()
@@ -1294,6 +1326,27 @@ async def drag_shape(
         "save_as": save_as,
     }
     return await _request("POST", "/ppt/drag_shape", json_body=body)
+
+
+@mcp.tool()
+async def reorder_shape_layer(
+    file_path: str,
+    slide_index: int,
+    action: str,
+    shape_id: Optional[int] = None,
+    shape_index: Optional[int] = None,
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """調整形狀圖層順序（to_front / to_back / forward / backward）"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "action": action,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+        "save_as": save_as,
+    }
+    return await _request("POST", "/ppt/reorder_shape_layer", json_body=body)
 
 
 @mcp.tool()
@@ -1448,6 +1501,220 @@ async def clone_named_shape_from_template(
     if save_as:
         body["save_as"] = save_as
     return await _request("POST", "/ppt/clone_named_shape_from_template", json_body=body)
+
+
+@mcp.tool()
+async def slide_animations(file_path: str, slide_index: int = 0) -> Dict[str, Any]:
+    """讀取投影片動畫列表"""
+    return await _request(
+        "GET",
+        "/ppt/slide_animations",
+        params={"file_path": file_path, "slide_index": slide_index},
+    )
+
+
+@mcp.tool()
+async def shape_animations(
+        file_path: str,
+        slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    """讀取指定 shape 動畫列表"""
+    return await _request(
+        "GET",
+        "/ppt/shape_animations",
+        params={
+            "file_path": file_path,
+            "slide_index": slide_index,
+            "shape_id": shape_id,
+            "shape_index": shape_index,
+        },
+    )
+
+
+@mcp.tool()
+async def add_shape_animation(
+        file_path: str,
+        slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        effect_type: str = "fade",
+        trigger: str = "on_click",
+        duration_ms: int = 500,
+        delay_ms: int = 0,
+        save_as: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    """新增 shape 動畫"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+        "effect_type": effect_type,
+        "trigger": trigger,
+        "duration_ms": duration_ms,
+        "delay_ms": delay_ms,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/add_shape_animation", json_body=body)
+
+
+@mcp.tool()
+async def update_shape_animation(
+        file_path: str,
+        slide_index: int,
+        animation_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        effect_type: Optional[str] = None,
+        trigger: Optional[str] = None,
+        duration_ms: Optional[int] = None,
+        delay_ms: Optional[int] = None,
+        save_as: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    """更新 shape 動畫"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "animation_index": animation_index,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+        "effect_type": effect_type,
+        "trigger": trigger,
+        "duration_ms": duration_ms,
+        "delay_ms": delay_ms,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/update_shape_animation", json_body=body)
+
+
+@mcp.tool()
+async def delete_shape_animation(
+        file_path: str,
+        slide_index: int,
+        animation_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        save_as: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    """刪除 shape 動畫"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "animation_index": animation_index,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/delete_shape_animation", json_body=body)
+
+
+@mcp.tool()
+async def clear_shape_animations(
+        file_path: str,
+        slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        save_as: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    """清除單一 shape 的全部動畫"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/clear_shape_animations", json_body=body)
+
+
+@mcp.tool()
+async def clear_slide_animations(
+        file_path: str,
+        slide_index: int,
+        save_as: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    """清除投影片全部動畫"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/clear_slide_animations", json_body=body)
+
+
+@mcp.tool()
+async def reorder_slide_animations(
+        file_path: str,
+        slide_index: int,
+        new_order: List[int],
+        save_as: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    """重排投影片動畫順序"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "new_order": new_order,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/reorder_slide_animations", json_body=body)
+
+
+@mcp.tool()
+async def slide_transition(file_path: str, slide_index: int = 0) -> Dict[str, Any]:
+    """讀取投影片轉場設定"""
+    return await _request(
+        "GET",
+        "/ppt/slide_transition",
+        params={"file_path": file_path, "slide_index": slide_index},
+    )
+
+
+@mcp.tool()
+async def set_slide_transition(
+        file_path: str,
+        slide_index: int,
+        transition_type: str = "fade",
+        duration_ms: Optional[int] = None,
+        advance_on_click: bool = True,
+        advance_after_ms: Optional[int] = None,
+        save_as: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    """設定投影片轉場"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "transition_type": transition_type,
+        "duration_ms": duration_ms,
+        "advance_on_click": advance_on_click,
+        "advance_after_ms": advance_after_ms,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/set_slide_transition", json_body=body)
+
+
+@mcp.tool()
+async def clear_slide_transition(
+        file_path: str,
+        slide_index: int,
+        save_as: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    """清除投影片轉場"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/clear_slide_transition", json_body=body)
 
 
 @mcp.tool()
@@ -1627,4 +1894,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

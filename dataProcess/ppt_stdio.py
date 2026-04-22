@@ -72,6 +72,7 @@ DEFAULT_FONT_EN = "Consolas"
 
 import dataProcess as dp
 from dataProcess import ppt_table_ops as _ppt_table_ops
+from dataProcess import ppt_animation_ops as _ppt_animation_ops
 
 PYTHON_PPTX_AVAILABLE = dp.ptp.PYTHON_PPTX_AVAILABLE
 Presentation = dp.ptp.Presentation
@@ -806,7 +807,7 @@ class PPTDocument:
             image_path: str,
         ) -> Dict[str, Any]:
         """
-        用滿版圖片模擬投影片背景
+        以 PPTX 原生背景（p:bg + a:blipFill）設定單頁背景圖片
         """
         _validate_slide_index(self.prs, slide_index)
 
@@ -818,20 +819,54 @@ class PPTDocument:
             raise FileNotFoundError(f"找不到圖片: {image_path}")
 
         slide = self.prs.slides[slide_index]
-
         picture = slide.shapes.add_picture(
             image_path,
             0,
             0,
-            width=self.prs.slide_width,
-            height=self.prs.slide_height,
+            width=1,
+            height=1,
         )
+        blips = list(picture._element.iter(qn("a:blip")))
+        if not blips:
+            raise RuntimeError("無法從圖片 shape 取得 r:embed，背景設定失敗")
+        image_rid = blips[0].get(qn("r:embed"))
+        if not image_rid:
+            raise RuntimeError("圖片缺少 r:embed 關聯，背景設定失敗")
+
+        sp_tree = slide.shapes._spTree
+        sp_tree.remove(picture._element)
+
+        c_sld = slide._element.find(qn("p:cSld"))
+        if c_sld is None:
+            raise RuntimeError("slide XML 缺少 p:cSld，背景設定失敗")
+
+        old_bg = c_sld.find(qn("p:bg"))
+        if old_bg is not None:
+            c_sld.remove(old_bg)
+
+        bg = OxmlElement("p:bg")
+        bg_pr = OxmlElement("p:bgPr")
+        blip_fill = OxmlElement("a:blipFill")
+        blip_fill.set("rotWithShape", "1")
+
+        blip = OxmlElement("a:blip")
+        blip.set(qn("r:embed"), image_rid)
+        stretch = OxmlElement("a:stretch")
+        stretch.append(OxmlElement("a:fillRect"))
+        blip_fill.append(blip)
+        blip_fill.append(stretch)
+        bg_pr.append(blip_fill)
+        bg_pr.append(OxmlElement("a:effectLst"))
+        bg.append(bg_pr)
+        c_sld.insert(0, bg)
 
         return {
             "slide_index": slide_index,
-            "background_type": "image",
+            "background_type": "picture",
+            "source": "slide_bgPr_blipFill",
             "image_path": image_path,
-            "shape_id": picture.shape_id,
+            "image_ref": image_rid,
+            "native_background": True,
         }
 
     def set_slides_background_color(
@@ -844,6 +879,10 @@ class PPTDocument:
             results.append(self.set_slide_background_color(slide_index, rgb))
         return results
 
+    def set_all_slides_background_color(self, rgb: Tuple[int, int, int]) -> List[Dict[str, Any]]:
+        slide_indices = list(range(len(self.prs.slides)))
+        return self.set_slides_background_color(slide_indices=slide_indices, rgb=rgb)
+
     def set_slides_background_image(
             self,
             slide_indices: List[int],
@@ -853,6 +892,10 @@ class PPTDocument:
         for slide_index in slide_indices:
             results.append(self.set_slide_background_image(slide_index, image_path))
         return results
+
+    def set_all_slides_background_image(self, image_path: str) -> List[Dict[str, Any]]:
+        slide_indices = list(range(len(self.prs.slides)))
+        return self.set_slides_background_image(slide_indices=slide_indices, image_path=image_path)
 
     def get_info(self) -> Dict[str, Any]:
         return {
@@ -1194,6 +1237,123 @@ class PPTDocument:
             "remaining_shape_count": len(self.prs.slides[slide_index].shapes),
         }
 
+    def get_slide_animations(self, slide_index: int) -> Dict[str, Any]:
+        return _ppt_animation_ops.get_slide_animations(self, slide_index)
+
+    def get_shape_animations(
+            self,
+            slide_index: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+        ) -> Dict[str, Any]:
+        return _ppt_animation_ops.get_shape_animations(
+            self,
+            slide_index,
+            shape_id=shape_id,
+            shape_index=shape_index,
+        )
+
+    def add_shape_animation(
+            self,
+            slide_index: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+            effect_type: str = "fade",
+            trigger: str = "on_click",
+            duration_ms: int = 500,
+            delay_ms: int = 0,
+        ) -> Dict[str, Any]:
+        return _ppt_animation_ops.add_shape_animation(
+            self,
+            slide_index,
+            shape_id=shape_id,
+            shape_index=shape_index,
+            effect_type=effect_type,
+            trigger=trigger,
+            duration_ms=duration_ms,
+            delay_ms=delay_ms,
+        )
+
+    def update_shape_animation(
+            self,
+            slide_index: int,
+            animation_index: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+            effect_type: Optional[str] = None,
+            trigger: Optional[str] = None,
+            duration_ms: Optional[int] = None,
+            delay_ms: Optional[int] = None,
+        ) -> Dict[str, Any]:
+        return _ppt_animation_ops.update_shape_animation(
+            self,
+            slide_index,
+            animation_index,
+            shape_id=shape_id,
+            shape_index=shape_index,
+            effect_type=effect_type,
+            trigger=trigger,
+            duration_ms=duration_ms,
+            delay_ms=delay_ms,
+        )
+
+    def delete_shape_animation(
+            self,
+            slide_index: int,
+            animation_index: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+        ) -> Dict[str, Any]:
+        return _ppt_animation_ops.delete_shape_animation(
+            self,
+            slide_index,
+            animation_index,
+            shape_id=shape_id,
+            shape_index=shape_index,
+        )
+
+    def clear_shape_animations(
+            self,
+            slide_index: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+        ) -> Dict[str, Any]:
+        return _ppt_animation_ops.clear_shape_animations(
+            self,
+            slide_index,
+            shape_id=shape_id,
+            shape_index=shape_index,
+        )
+
+    def clear_slide_animations(self, slide_index: int) -> Dict[str, Any]:
+        return _ppt_animation_ops.clear_slide_animations(self, slide_index)
+
+    def reorder_slide_animations(self, slide_index: int, new_order: List[int]) -> Dict[str, Any]:
+        return _ppt_animation_ops.reorder_slide_animations(self, slide_index, new_order)
+
+    def get_slide_transition(self, slide_index: int) -> Dict[str, Any]:
+        return _ppt_animation_ops.get_slide_transition(self, slide_index)
+
+    def set_slide_transition(
+            self,
+            slide_index: int,
+            transition_type: str = "fade",
+            duration_ms: Optional[int] = None,
+            advance_on_click: bool = True,
+            advance_after_ms: Optional[int] = None,
+        ) -> Dict[str, Any]:
+        return _ppt_animation_ops.set_slide_transition(
+            self,
+            slide_index,
+            transition_type=transition_type,
+            duration_ms=duration_ms,
+            advance_on_click=advance_on_click,
+            advance_after_ms=advance_after_ms,
+        )
+
+    def clear_slide_transition(self, slide_index: int) -> Dict[str, Any]:
+        return _ppt_animation_ops.clear_slide_transition(self, slide_index)
+
     def get_slide_text_fonts(self, slide_index: int) -> Dict[str, Any]:
         """
         讀取指定頁文字來源（文字框與表格 cell）內各 run 的字型資訊。
@@ -1381,6 +1541,99 @@ class PPTDocument:
             raise IndexError(f"shape_index 超出範圍: {shape_index}, shape_count={len(slide.shapes)}")
 
         return slide.shapes[shape_index], shape_index
+
+    def reorder_shape_layer(
+            self,
+            slide_index: int,
+            action: str,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+        ) -> Dict[str, Any]:
+        shape, resolved_shape_index = self._get_shape(
+            slide_index=slide_index,
+            shape_id=shape_id,
+            shape_index=shape_index,
+        )
+
+        action_key = str(action or "").strip().lower()
+        action_aliases = {
+            "to_front": "to_front",
+            "front": "to_front",
+            "top": "to_front",
+            "bring_to_front": "to_front",
+            "to_back": "to_back",
+            "back": "to_back",
+            "bottom": "to_back",
+            "send_to_back": "to_back",
+            "forward": "forward",
+            "up": "forward",
+            "bring_forward": "forward",
+            "backward": "backward",
+            "down": "backward",
+            "send_backward": "backward",
+        }
+        if action_key not in action_aliases:
+            allowed = ["to_front", "to_back", "forward", "backward"]
+            raise ValueError(f"action 不支援: {action}，可用值: {allowed}")
+        normalized_action = action_aliases[action_key]
+
+        slide = self.prs.slides[slide_index]
+        sp_tree = slide.shapes._spTree
+        shape_element = shape.element
+        children = list(sp_tree)
+
+        try:
+            before_xml_index = children.index(shape_element)
+        except ValueError:
+            raise ValueError("找不到目標 shape 的 XML 節點，無法調整圖層")
+
+        # p:spTree 前兩個節點通常是 nvGrpSpPr / grpSpPr，圖形不可移到這兩個節點之前。
+        min_xml_index = 0
+        grp_tag = qn("p:grpSpPr")
+        for idx, child in enumerate(children):
+            if child.tag == grp_tag:
+                min_xml_index = idx + 1
+                break
+        max_xml_index = len(children) - 1
+
+        if before_xml_index < min_xml_index or before_xml_index > max_xml_index:
+            raise ValueError("目標 shape 不在可調整圖層範圍")
+
+        if normalized_action == "to_front":
+            target_xml_index = max_xml_index
+        elif normalized_action == "to_back":
+            target_xml_index = min_xml_index
+        elif normalized_action == "forward":
+            target_xml_index = min(before_xml_index + 1, max_xml_index)
+        else:
+            target_xml_index = max(before_xml_index - 1, min_xml_index)
+
+        moved = target_xml_index != before_xml_index
+        if moved:
+            sp_tree.remove(shape_element)
+            if target_xml_index > before_xml_index:
+                target_xml_index -= 1
+            sp_tree.insert(target_xml_index, shape_element)
+
+        after_xml_index = list(sp_tree).index(shape_element)
+        after_shape_index = resolved_shape_index
+        for idx, candidate in enumerate(slide.shapes):
+            if candidate.element is shape_element:
+                after_shape_index = idx
+                break
+
+        return {
+            "slide_index": slide_index,
+            "shape_id": getattr(shape, "shape_id", None),
+            "shape_name": getattr(shape, "name", None),
+            "action_requested": action,
+            "action_applied": normalized_action,
+            "moved": moved,
+            "before_shape_index": resolved_shape_index,
+            "after_shape_index": after_shape_index,
+            "before_xml_index": before_xml_index,
+            "after_xml_index": after_xml_index,
+        }
 
     def get_shape_style(self, slide_index: int, shape_id: Optional[int] = None, shape_index: Optional[int] = None) -> Dict[str, Any]:
         shape, resolved_shape_index = self._get_shape(
@@ -4363,6 +4616,21 @@ def drag_shape(
     )
 
 
+def reorder_shape_layer(
+        document: PPTDocument,
+        slide_index: int,
+        action: str,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    return document.reorder_shape_layer(
+        slide_index=slide_index,
+        action=action,
+        shape_id=shape_id,
+        shape_index=shape_index,
+    )
+
+
 def drag_textbox(
         document: PPTDocument,
         slide_index: int,
@@ -4401,6 +4669,128 @@ def delete_textbox(
     )
 
 
+def get_slide_animations(document: PPTDocument, slide_index: int) -> Dict[str, Any]:
+    return document.get_slide_animations(slide_index=slide_index)
+
+
+def get_shape_animations(
+        document: PPTDocument,
+        slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    return document.get_shape_animations(
+        slide_index=slide_index,
+        shape_id=shape_id,
+        shape_index=shape_index,
+    )
+
+
+def add_shape_animation(
+        document: PPTDocument,
+        slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        effect_type: str = "fade",
+        trigger: str = "on_click",
+        duration_ms: int = 500,
+        delay_ms: int = 0,
+    ) -> Dict[str, Any]:
+    return document.add_shape_animation(
+        slide_index=slide_index,
+        shape_id=shape_id,
+        shape_index=shape_index,
+        effect_type=effect_type,
+        trigger=trigger,
+        duration_ms=duration_ms,
+        delay_ms=delay_ms,
+    )
+
+
+def update_shape_animation(
+        document: PPTDocument,
+        slide_index: int,
+        animation_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        effect_type: Optional[str] = None,
+        trigger: Optional[str] = None,
+        duration_ms: Optional[int] = None,
+        delay_ms: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    return document.update_shape_animation(
+        slide_index=slide_index,
+        animation_index=animation_index,
+        shape_id=shape_id,
+        shape_index=shape_index,
+        effect_type=effect_type,
+        trigger=trigger,
+        duration_ms=duration_ms,
+        delay_ms=delay_ms,
+    )
+
+
+def delete_shape_animation(
+        document: PPTDocument,
+        slide_index: int,
+        animation_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    return document.delete_shape_animation(
+        slide_index=slide_index,
+        animation_index=animation_index,
+        shape_id=shape_id,
+        shape_index=shape_index,
+    )
+
+
+def clear_shape_animations(
+        document: PPTDocument,
+        slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    return document.clear_shape_animations(
+        slide_index=slide_index,
+        shape_id=shape_id,
+        shape_index=shape_index,
+    )
+
+
+def clear_slide_animations(document: PPTDocument, slide_index: int) -> Dict[str, Any]:
+    return document.clear_slide_animations(slide_index=slide_index)
+
+
+def reorder_slide_animations(document: PPTDocument, slide_index: int, new_order: List[int]) -> Dict[str, Any]:
+    return document.reorder_slide_animations(slide_index=slide_index, new_order=new_order)
+
+
+def get_slide_transition(document: PPTDocument, slide_index: int) -> Dict[str, Any]:
+    return document.get_slide_transition(slide_index=slide_index)
+
+
+def set_slide_transition(
+        document: PPTDocument,
+        slide_index: int,
+        transition_type: str = "fade",
+        duration_ms: Optional[int] = None,
+        advance_on_click: bool = True,
+        advance_after_ms: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    return document.set_slide_transition(
+        slide_index=slide_index,
+        transition_type=transition_type,
+        duration_ms=duration_ms,
+        advance_on_click=advance_on_click,
+        advance_after_ms=advance_after_ms,
+    )
+
+
+def clear_slide_transition(document: PPTDocument, slide_index: int) -> Dict[str, Any]:
+    return document.clear_slide_transition(slide_index=slide_index)
+
+
 def get_slide_text_fonts(document: PPTDocument, slide_index: int) -> Dict[str, Any]:
     return document.get_slide_text_fonts(slide_index=slide_index)
 
@@ -4423,6 +4813,13 @@ def set_slide_background_image(
         image_path: str,
     ) -> dict:
     return document.set_slide_background_image(slide_index=slide_index, image_path=image_path)
+
+
+def set_all_slides_background_image(
+        document: PPTDocument,
+        image_path: str,
+    ) -> List[Dict[str, Any]]:
+    return document.set_all_slides_background_image(image_path=image_path)
 
 
 # ---------------------------------------------------------------------------
@@ -4754,7 +5151,9 @@ def _detect_full_slide_picture_shape(document: PPTDocument, slide_index: int) ->
     best_candidate: Optional[Dict[str, Any]] = None
 
     for shape_index, shape in enumerate(slide.shapes):
-        if not hasattr(shape, "image"):
+        try:
+            image_obj = shape.image
+        except Exception:
             continue
 
         try:
@@ -4783,18 +5182,12 @@ def _detect_full_slide_picture_shape(document: PPTDocument, slide_index: int) ->
         image_path_hint = None
 
         try:
-            image_path_hint = getattr(shape.image, "filename", None)
+            image_path_hint = getattr(image_obj, "filename", None)
         except Exception:
             image_path_hint = None
 
         try:
-            blips = shape._element.xpath(
-                ".//a:blip",
-                namespaces={
-                    "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
-                    "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
-                },
-            )
+            blips = list(shape._element.iter(qn("a:blip")))
             if blips:
                 image_ref = blips[0].get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed")
         except Exception:
@@ -5144,6 +5537,13 @@ def set_slides_background_color(
         rgb: Tuple[int, int, int],
     ) -> List[Dict[str, Any]]:
     return document.set_slides_background_color(slide_indices=slide_indices, rgb=rgb)
+
+
+def set_all_slides_background_color(
+        document: PPTDocument,
+        rgb: Tuple[int, int, int],
+    ) -> List[Dict[str, Any]]:
+    return document.set_all_slides_background_color(rgb=rgb)
 
 
 def set_slides_background_image(

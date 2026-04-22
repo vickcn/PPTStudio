@@ -64,8 +64,20 @@ from dataProcess.ppt_stdio import (
     get_slide_textbox_styles,
     set_textbox_style,
     drag_shape,
+    reorder_shape_layer,
     drag_textbox,
     delete_textbox,
+    get_slide_animations,
+    get_shape_animations,
+    add_shape_animation,
+    update_shape_animation,
+    delete_shape_animation,
+    clear_shape_animations,
+    clear_slide_animations,
+    reorder_slide_animations,
+    get_slide_transition,
+    set_slide_transition,
+    clear_slide_transition,
     delete_shape,
     clone_named_shape_from_template,
     get_slide_text_fonts,
@@ -77,6 +89,8 @@ from dataProcess.ppt_stdio import (
     set_slide_background_image,
     set_slides_background_color,
     set_slides_background_image,
+    set_all_slides_background_color,
+    set_all_slides_background_image,
     delete_slide,
     duplicate_slide,
     replace_text,
@@ -552,9 +566,21 @@ class SetSlidesBackgroundColorRequest(BaseModel):
     save_as: Optional[str] = None
 
 
+class SetAllSlidesBackgroundColorRequest(BaseModel):
+    file_path: str
+    rgb: List[int] = Field(..., min_length=3, max_length=3)
+    save_as: Optional[str] = None
+
+
 class SetSlidesBackgroundImageRequest(BaseModel):
     file_path: str
     slide_indices: List[int]
+    image_path: str
+    save_as: Optional[str] = None
+
+
+class SetAllSlidesBackgroundImageRequest(BaseModel):
+    file_path: str
     image_path: str
     save_as: Optional[str] = None
 
@@ -616,6 +642,86 @@ class DragShapeRequest(BaseModel):
     delta_y: Optional[int] = None
     width: Optional[int] = Field(None, gt=0)
     height: Optional[int] = Field(None, gt=0)
+    save_as: Optional[str] = None
+
+
+class ReorderShapeLayerRequest(BaseModel):
+    file_path: str
+    slide_index: int = Field(..., ge=0)
+    action: str = Field(..., description="to_front | to_back | forward | backward")
+    shape_id: Optional[int] = None
+    shape_index: Optional[int] = Field(None, ge=0)
+    save_as: Optional[str] = None
+
+
+class AddShapeAnimationRequest(BaseModel):
+    file_path: str
+    slide_index: int = Field(..., ge=0)
+    shape_id: Optional[int] = None
+    shape_index: Optional[int] = Field(None, ge=0)
+    effect_type: str = "fade"
+    trigger: str = "on_click"
+    duration_ms: int = Field(500, gt=0)
+    delay_ms: int = Field(0, ge=0)
+    save_as: Optional[str] = None
+
+
+class UpdateShapeAnimationRequest(BaseModel):
+    file_path: str
+    slide_index: int = Field(..., ge=0)
+    animation_index: int = Field(..., ge=0)
+    shape_id: Optional[int] = None
+    shape_index: Optional[int] = Field(None, ge=0)
+    effect_type: Optional[str] = None
+    trigger: Optional[str] = None
+    duration_ms: Optional[int] = Field(None, gt=0)
+    delay_ms: Optional[int] = Field(None, ge=0)
+    save_as: Optional[str] = None
+
+
+class DeleteShapeAnimationRequest(BaseModel):
+    file_path: str
+    slide_index: int = Field(..., ge=0)
+    animation_index: int = Field(..., ge=0)
+    shape_id: Optional[int] = None
+    shape_index: Optional[int] = Field(None, ge=0)
+    save_as: Optional[str] = None
+
+
+class ClearShapeAnimationsRequest(BaseModel):
+    file_path: str
+    slide_index: int = Field(..., ge=0)
+    shape_id: Optional[int] = None
+    shape_index: Optional[int] = Field(None, ge=0)
+    save_as: Optional[str] = None
+
+
+class ClearSlideAnimationsRequest(BaseModel):
+    file_path: str
+    slide_index: int = Field(..., ge=0)
+    save_as: Optional[str] = None
+
+
+class ReorderSlideAnimationsRequest(BaseModel):
+    file_path: str
+    slide_index: int = Field(..., ge=0)
+    new_order: List[int]
+    save_as: Optional[str] = None
+
+
+class SetSlideTransitionRequest(BaseModel):
+    file_path: str
+    slide_index: int = Field(..., ge=0)
+    transition_type: str = "fade"
+    duration_ms: Optional[int] = Field(None, ge=0)
+    advance_on_click: bool = True
+    advance_after_ms: Optional[int] = Field(None, ge=0)
+    save_as: Optional[str] = None
+
+
+class ClearSlideTransitionRequest(BaseModel):
+    file_path: str
+    slide_index: int = Field(..., ge=0)
     save_as: Optional[str] = None
 
 
@@ -988,6 +1094,27 @@ def ppt_drag_shape(req: DragShapeRequest):
         _err_to_http(e)
 
 
+@app.post("/ppt/reorder_shape_layer")
+def ppt_reorder_shape_layer(req: ReorderShapeLayerRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = reorder_shape_layer(
+            document=doc,
+            slide_index=req.slide_index,
+            action=req.action,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="shape 圖層調整成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
 @app.post("/ppt/delete_textbox")
 def ppt_delete_textbox(req: DeleteTextboxRequest):
     try:
@@ -1046,6 +1173,206 @@ def ppt_clone_named_shape_from_template(req: CloneNamedShapeFromTemplateRequest)
             "result": result,
             "info": get_info(doc),
         }, message="複製命名 shape 成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.get("/ppt/slide_animations")
+def ppt_slide_animations(file_path: str, slide_index: int = 0):
+    try:
+        doc = open_presentation(file_path)
+        return _ok(get_slide_animations(doc, slide_index))
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.get("/ppt/shape_animations")
+def ppt_shape_animations(
+        file_path: str,
+        slide_index: int = 0,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+    ):
+    try:
+        doc = open_presentation(file_path)
+        return _ok(
+            get_shape_animations(
+                doc,
+                slide_index=slide_index,
+                shape_id=shape_id,
+                shape_index=shape_index,
+            )
+        )
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/add_shape_animation")
+def ppt_add_shape_animation(req: AddShapeAnimationRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = add_shape_animation(
+            document=doc,
+            slide_index=req.slide_index,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+            effect_type=req.effect_type,
+            trigger=req.trigger,
+            duration_ms=req.duration_ms,
+            delay_ms=req.delay_ms,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="新增 shape 動畫成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/update_shape_animation")
+def ppt_update_shape_animation(req: UpdateShapeAnimationRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = update_shape_animation(
+            document=doc,
+            slide_index=req.slide_index,
+            animation_index=req.animation_index,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+            effect_type=req.effect_type,
+            trigger=req.trigger,
+            duration_ms=req.duration_ms,
+            delay_ms=req.delay_ms,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="更新 shape 動畫成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/delete_shape_animation")
+def ppt_delete_shape_animation(req: DeleteShapeAnimationRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = delete_shape_animation(
+            document=doc,
+            slide_index=req.slide_index,
+            animation_index=req.animation_index,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="刪除 shape 動畫成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/clear_shape_animations")
+def ppt_clear_shape_animations(req: ClearShapeAnimationsRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = clear_shape_animations(
+            document=doc,
+            slide_index=req.slide_index,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="清除 shape 動畫成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/clear_slide_animations")
+def ppt_clear_slide_animations(req: ClearSlideAnimationsRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = clear_slide_animations(document=doc, slide_index=req.slide_index)
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="清除投影片動畫成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/reorder_slide_animations")
+def ppt_reorder_slide_animations(req: ReorderSlideAnimationsRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = reorder_slide_animations(
+            document=doc,
+            slide_index=req.slide_index,
+            new_order=req.new_order,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="重排投影片動畫成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.get("/ppt/slide_transition")
+def ppt_slide_transition(file_path: str, slide_index: int = 0):
+    try:
+        doc = open_presentation(file_path)
+        return _ok(get_slide_transition(doc, slide_index=slide_index))
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/set_slide_transition")
+def ppt_set_slide_transition(req: SetSlideTransitionRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = set_slide_transition(
+            document=doc,
+            slide_index=req.slide_index,
+            transition_type=req.transition_type,
+            duration_ms=req.duration_ms,
+            advance_on_click=req.advance_on_click,
+            advance_after_ms=req.advance_after_ms,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="設定投影片轉場成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/clear_slide_transition")
+def ppt_clear_slide_transition(req: ClearSlideTransitionRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = clear_slide_transition(document=doc, slide_index=req.slide_index)
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="清除投影片轉場成功")
     except Exception as e:
         _err_to_http(e)
 
@@ -1909,6 +2236,21 @@ def ppt_set_slides_background_color(req: SetSlidesBackgroundColorRequest):
         _err_to_http(e)
 
 
+@app.post("/ppt/set_all_slides_background_color")
+def ppt_set_all_slides_background_color(req: SetAllSlidesBackgroundColorRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = set_all_slides_background_color(doc, tuple(req.rgb))
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="套用全部背景顏色成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
 @app.post("/ppt/set_slides_background_image")
 def ppt_set_slides_background_image(req: SetSlidesBackgroundImageRequest):
     try:
@@ -1920,6 +2262,21 @@ def ppt_set_slides_background_image(req: SetSlidesBackgroundImageRequest):
             "result": result,
             "info": get_info(doc),
         }, message="設定多頁背景圖片成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/set_all_slides_background_image")
+def ppt_set_all_slides_background_image(req: SetAllSlidesBackgroundImageRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = set_all_slides_background_image(doc, req.image_path)
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="套用全部背景圖片成功")
     except Exception as e:
         _err_to_http(e)
 
