@@ -18,6 +18,9 @@ tmp*
 *pyc*
 *.zip
 dataP**
+**.DS_Store
+**code-workspace**
+**.claude**
 
 *analysis_result*.json
 *timer*.json

@@ -819,12 +819,13 @@ class PPTDocument:
             raise FileNotFoundError(f"找不到圖片: {image_path}")
 
         slide = self.prs.slides[slide_index]
+
         picture = slide.shapes.add_picture(
             image_path,
             0,
             0,
-            width=1,
-            height=1,
+            width=self.prs.slide_width,
+            height=self.prs.slide_height,
         )
         blips = list(picture._element.iter(qn("a:blip")))
         if not blips:
