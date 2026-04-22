@@ -803,13 +803,7 @@ class PPTDocument:
             width=1,
             height=1,
         )
-        blips = picture._element.xpath(
-            ".//a:blip",
-            namespaces={
-                "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
-                "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
-            },
-        )
+        blips = list(picture._element.iter(qn("a:blip")))
         if not blips:
             raise RuntimeError("無法從圖片 shape 取得 r:embed，背景設定失敗")
         image_rid = blips[0].get(qn("r:embed"))
@@ -5134,7 +5128,9 @@ def _detect_full_slide_picture_shape(document: PPTDocument, slide_index: int) ->
     best_candidate: Optional[Dict[str, Any]] = None
 
     for shape_index, shape in enumerate(slide.shapes):
-        if not hasattr(shape, "image"):
+        try:
+            image_obj = shape.image
+        except Exception:
             continue
 
         try:
@@ -5163,18 +5159,12 @@ def _detect_full_slide_picture_shape(document: PPTDocument, slide_index: int) ->
         image_path_hint = None
 
         try:
-            image_path_hint = getattr(shape.image, "filename", None)
+            image_path_hint = getattr(image_obj, "filename", None)
         except Exception:
             image_path_hint = None
 
         try:
-            blips = shape._element.xpath(
-                ".//a:blip",
-                namespaces={
-                    "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
-                    "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
-                },
-            )
+            blips = list(shape._element.iter(qn("a:blip")))
             if blips:
                 image_ref = blips[0].get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed")
         except Exception:
