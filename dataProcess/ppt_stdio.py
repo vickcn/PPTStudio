@@ -16,6 +16,7 @@ PPTX 核心操作模組
 """
 
 import os
+import sys
 import json
 import re
 import logging
@@ -177,10 +178,71 @@ def _contains_cjk(text: str) -> bool:
     return False
 
 
+_ZH_FONT_FALLBACKS_WIN = [
+    "微軟正黑體",
+    "Microsoft JhengHei",
+    "Microsoft YaHei",
+    "PingFang TC",
+    "Noto Sans CJK TC",
+    "SimHei",
+]
+
+_ZH_FONT_FALLBACKS_DARWIN = [
+    "PingFang TC",
+    "PingFang SC",
+    "Noto Sans CJK TC",
+    "Microsoft JhengHei",
+    "微軟正黑體",
+    "SimHei",
+]
+
+_ZH_FONT_FALLBACKS_OTHER = [
+    "Noto Sans CJK TC",
+    "Noto Sans CJK SC",
+    "Microsoft JhengHei",
+    "PingFang TC",
+    "SimHei",
+    "微軟正黑體",
+]
+
+
+def _zh_font_fallback_candidates() -> List[str]:
+    if sys.platform == "win32":
+        return _ZH_FONT_FALLBACKS_WIN
+    if sys.platform == "darwin":
+        return _ZH_FONT_FALLBACKS_DARWIN
+    return _ZH_FONT_FALLBACKS_OTHER
+
+
+def _get_installed_font_names() -> Optional[set]:
+    if not PYTHON_PPTX_EXTRA_AVAILABLE:
+        return None
+    try:
+        return {f.name for f in font_manager.fontManager.ttflist}
+    except Exception:
+        return None
+
+
+def _first_available_font(candidates: List[str], fallback: str) -> str:
+    available = _get_installed_font_names()
+    if not available:
+        return fallback
+    for candidate in candidates:
+        if candidate in available:
+            return candidate
+    return fallback
+
+
+def _first_available_zh_font() -> str:
+    return _first_available_font(_zh_font_fallback_candidates(), DEFAULT_FONT_ZH)
+
+
 def _get_default_fonts() -> Tuple[str, str]:
     config = _load_pptstudio_config()
     fonts_config = config.get("fonts", {}) if isinstance(config, dict) else {}
-    zh_font = str(fonts_config.get("default_zh", DEFAULT_FONT_ZH)).strip() or DEFAULT_FONT_ZH
+    zh_font = str(fonts_config.get("default_zh", "")).strip()
+    if not zh_font:
+        zh_font = _first_available_zh_font()
     en_font = str(fonts_config.get("default_en", DEFAULT_FONT_EN)).strip() or DEFAULT_FONT_EN
     return zh_font, en_font
 
@@ -230,22 +292,14 @@ def _activate_matplotlib_chinese_font() -> None:
     if not PYTHON_PPTX_EXTRA_AVAILABLE:
         return
 
-    preferred_fonts = [
-        "Microsoft JhengHei",
-        "Microsoft YaHei",
-        "PingFang TC",
-        "Noto Sans CJK TC",
-        "Noto Sans CJK SC",
-        "SimHei",
-        "DejaVu Sans",
-    ]
+    preferred_fonts = _zh_font_fallback_candidates() + ["DejaVu Sans"]
     try:
-        available_fonts = {f.name for f in font_manager.fontManager.ttflist}
+        available_fonts = _get_installed_font_names() or set()
         active_fonts = [font for font in preferred_fonts if font in available_fonts]
         if not active_fonts:
             active_fonts = ["DejaVu Sans"]
     except Exception:
-        active_fonts = ["Microsoft JhengHei", "DejaVu Sans"]
+        active_fonts = [_first_available_zh_font(), "DejaVu Sans"]
 
     plt.rcParams["font.sans-serif"] = active_fonts
     plt.rcParams["axes.unicode_minus"] = False
@@ -952,12 +1006,13 @@ class PPTDocument:
             raise FileNotFoundError(f"找不到圖片: {image_path}")
 
         slide = self.prs.slides[slide_index]
+
         picture = slide.shapes.add_picture(
             image_path,
             0,
             0,
-            width=1,
-            height=1,
+            width=self.prs.slide_width,
+            height=self.prs.slide_height,
         )
         blips = list(picture._element.iter(qn("a:blip")))
         if not blips:
