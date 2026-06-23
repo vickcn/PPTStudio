@@ -1,25 +1,46 @@
 {
-  "generated_at": "2026-04-17T17:58:03.146665",
+  "generated_at": "2026-06-23T14:15:25.466545",
   "base_url": "http://10.1.3.127:7017",
-  "provider": "openai",
-  "model": "gpt35_chat",
+  "provider": "remote",
+  "model": "remote8b",
   "templates_dirs": [],
   "input_files": [
     "C:\\ML_HOME\\PPTStudio\\api_server.py",
     "C:\\ML_HOME\\PPTStudio\\dataProcess\\__init__.py",
+    "C:\\ML_HOME\\PPTStudio\\dataProcess\\build.py",
+    "C:\\ML_HOME\\PPTStudio\\dataProcess\\check_overlap.py",
     "C:\\ML_HOME\\PPTStudio\\dataProcess\\ContextParser\\ppt_parser.py",
     "C:\\ML_HOME\\PPTStudio\\dataProcess\\file_importers.py",
+    "C:\\ML_HOME\\PPTStudio\\dataProcess\\parse.py",
+    "C:\\ML_HOME\\PPTStudio\\dataProcess\\ppt_animation_ops.py",
     "C:\\ML_HOME\\PPTStudio\\dataProcess\\ppt_stdio.py",
     "C:\\ML_HOME\\PPTStudio\\dataProcess\\ppt_table_ops.py",
     "C:\\ML_HOME\\PPTStudio\\mcp_server.py",
     "C:\\ML_HOME\\PPTStudio\\PPTStudio.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp\\detect_oob_masters_layouts.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp\\detect_oob_summary.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp\\detect_oob_summary_fit.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp\\detect_out_of_bounds.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp\\get_sizes.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp\\gitignore_test\\dataProcess\\new_file.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp\\inspect_groups.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp\\list_timing_slides.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp\\lo_export_slide_png.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp\\ppt_size_check.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp\\resize_and_scale_v5.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp\\resize_ppt.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp\\scan_timing.py",
     "C:\\ML_HOME\\PPTStudio\\tmp\\test_table_ops.py",
     "C:\\ML_HOME\\PPTStudio\\tmp\\test_textbox_transparency_compare.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp\\verify_fit_size.py",
     "C:\\ML_HOME\\PPTStudio\\tmp_io\\test_all_simple.py",
     "C:\\ML_HOME\\PPTStudio\\tmp_io\\test_new.py",
     "C:\\ML_HOME\\PPTStudio\\tmp_math\\generate_math_ppt_via_api.py",
     "C:\\ML_HOME\\PPTStudio\\tmp_math\\generate_math_ppt_via_api_omml.py",
-    "C:\\ML_HOME\\PPTStudio\\tmp_math\\generate_text_math_inline_via_api.py"
+    "C:\\ML_HOME\\PPTStudio\\tmp_math\\generate_text_math_inline_via_api.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp_sys\\build.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp_sys\\check_overlap.py",
+    "C:\\ML_HOME\\PPTStudio\\tmp_sys\\parse.py"
   ],
   "files": {
     "C:\\ML_HOME\\PPTStudio\\api_server.py": {
@@ -36,7 +57,7 @@
           "full_path": "/",
           "router_name": "app",
           "docstring": "",
-          "summary": "此 API 端點回傳 PPT API 伺服器的版本資訊。",
+          "summary": "這個 API 端點是 PPT API Server 的根端點，提供了關於伺服器的基本資訊。",
           "error": null
         },
         {
@@ -50,7 +71,7 @@
           "full_path": "/health",
           "router_name": "app",
           "docstring": "",
-          "summary": "此 API 端點用於檢查伺服器健康狀態，回傳狀態為健康。",
+          "summary": "這個 API 端點用於檢查伺服器的健康狀態，會返回一個字典物件，表示伺服器保持健康運作。",
           "error": null
         },
         {
@@ -64,7 +85,7 @@
           "full_path": "/ppt/import_file",
           "router_name": "app",
           "docstring": "",
-          "summary": "此API端點用於以POST方法將PPT文件導入，處理文件導入的相關操作並返回結果。",
+          "summary": "此 API 端點用於匯入簡報檔案。",
           "error": null
         },
         {
@@ -78,7 +99,7 @@
           "full_path": "/ppt/process_file",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點用於處理上傳的 PPT 檔案，透過 POST 方法將檔案傳送至伺服器進行處理。",
+          "summary": "此 API 端點用於處理簡報檔案。客戶端可以透過此端點上傳簡報檔案，並提供處理選項。伺服器會根據客戶端提供的選項和簡報檔案的內容，生成簡報的報告。",
           "error": null
         },
         {
@@ -92,7 +113,7 @@
           "full_path": "/ppt/run_stage_extract",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點的功能是執行 PPT 檔案的階段性提取，使用 POST 方法，需要提供 RunStageExtractRequest 物件作為輸入。",
+          "summary": "此 API 端點用於從現有檔案中提取執行階段資訊。",
           "error": null
         },
         {
@@ -106,7 +127,7 @@
           "full_path": "/ppt/run_stage_segment",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點的功能是運行 PPT 階段性片段，使用 POST 方法，接收 RunStageSegmentRequest 物件作為輸入。",
+          "summary": "此 API 端點用於執行簡報的階段切片。它允許使用者將長簡報分割成多個較小的階段，並在每個階段中執行特定的動作。",
           "error": null
         },
         {
@@ -120,7 +141,7 @@
           "full_path": "/ppt/run_stage_chunk",
           "router_name": "app",
           "docstring": "",
-          "summary": "此 API 端點用於執行 PPT 檔案的特定階段，接收 POST 請求並執行指定的操作。",
+          "summary": "此 API 端點用於執行簡報的階段切片。客戶端可以透過此端點上傳簡報的內容，並讓伺服器將簡報分割成多個階段，以便於後續的操作。",
           "error": null
         },
         {
@@ -134,7 +155,49 @@
           "full_path": "/ppt/run_parser_pipeline",
           "router_name": "app",
           "docstring": "",
-          "summary": "此 API 端點用於執行解析器流程，接收 POST 請求並處理 PPT 檔案的匯入、分段、分塊等操作。",
+          "summary": "此 API 端點用於執行解析管線，包括匯入檔案、分段和分塊等步驟，以從檔案中提取所需的資料。",
+          "error": null
+        },
+        {
+          "function": "ppt_parse_structure",
+          "name": "ppt_parse_structure",
+          "signature": "ppt_parse_structure(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/parse_structure",
+          "full_path": "/ppt/parse_structure",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於解析 .pptx 檔案的結構，並將其轉換為 JSON 格式。",
+          "error": null
+        },
+        {
+          "function": "ppt_build_from_structure",
+          "name": "ppt_build_from_structure",
+          "signature": "ppt_build_from_structure(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/build_from_structure",
+          "full_path": "/ppt/build_from_structure",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於從結構化的 JSON 檔案建立 PowerPoint 簡報。",
+          "error": null
+        },
+        {
+          "function": "ppt_check_overlap",
+          "name": "ppt_check_overlap",
+          "signature": "ppt_check_overlap(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/check_overlap",
+          "full_path": "/ppt/check_overlap",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於檢查投影片組合中是否有重疊的投影片。",
           "error": null
         },
         {
@@ -148,7 +211,7 @@
           "full_path": "/ppt/new",
           "router_name": "app",
           "docstring": "",
-          "summary": "此API端點用於建立新的PPT文件，接收請求後會創建PPT並返回相關資訊和幻燈片清單。",
+          "summary": "此 API 端點用於建立新的 PowerPoint 簡報。客戶端可以透過將簡報內容、頁面數目、頁面大小、頁面高度、解析度等引數傳送到該端點，伺服器會根據這些引數建立一個新的 PowerPoint 簡報並返回該簡報的路徑。",
           "error": null
         },
         {
@@ -162,7 +225,7 @@
           "full_path": "/ppt/info",
           "router_name": "app",
           "docstring": "",
-          "summary": "此API端點用於獲取指定PPT檔案的資訊。",
+          "summary": "此 API 端點用於從指定的檔案路徑取得簡報的相關資訊。",
           "error": null
         },
         {
@@ -176,7 +239,7 @@
           "full_path": "/ppt/slides",
           "router_name": "app",
           "docstring": "",
-          "summary": "此API端點用於獲取指定PPT文件的幻燈片清單。",
+          "summary": "此 API 端點用於從指定的檔案路徑取得 PowerPoint 簡報的滑片。",
           "error": null
         },
         {
@@ -190,7 +253,7 @@
           "full_path": "/ppt/textbox_style",
           "router_name": "app",
           "docstring": "",
-          "summary": "此API端點用於獲取PowerPoint中文字框的樣式設定。",
+          "summary": "這個 API 端點用於從投影片檔案中取得文字方塊樣式。",
           "error": null
         },
         {
@@ -204,7 +267,7 @@
           "full_path": "/ppt/slide_textbox_styles",
           "router_name": "app",
           "docstring": "",
-          "summary": "此API端點用於獲取PowerPoint幻燈片中文字框的樣式。",
+          "summary": "此 API 端點用於取得由檔案路徑指定的簡報中所指定投影片的文字方塊樣式。",
           "error": null
         },
         {
@@ -218,7 +281,21 @@
           "full_path": "/ppt/set_textbox_style",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點用於設置 PowerPoint 中文字框的樣式。",
+          "summary": "此 API 端點用於更新 PowerPoint 呈現式的文字框樣式。",
+          "error": null
+        },
+        {
+          "function": "ppt_set_textbox_text_style",
+          "name": "ppt_set_textbox_text_style",
+          "signature": "ppt_set_textbox_text_style(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/set_textbox_text_style",
+          "full_path": "/ppt/set_textbox_text_style",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於更新 PowerPoint 呈現片中文字框的文字樣式。",
           "error": null
         },
         {
@@ -232,7 +309,7 @@
           "full_path": "/ppt/drag_textbox",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點用於在 PowerPoint 中拖曳文字框，成功後返回相關資訊。",
+          "summary": "此 API 端點用於拖曳文字框功能，允許使用者在簡報中建立和修改文字框。",
           "error": null
         },
         {
@@ -246,7 +323,21 @@
           "full_path": "/ppt/drag_shape",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點用於拖曳 PowerPoint 中的形狀，並返回處理結果和相關資訊。",
+          "summary": "此 API 端點用於拖曳功力點 (DragShape)。它允許使用者在簡報中拖曳形狀。",
+          "error": null
+        },
+        {
+          "function": "ppt_reorder_shape_layer",
+          "name": "ppt_reorder_shape_layer",
+          "signature": "ppt_reorder_shape_layer(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/reorder_shape_layer",
+          "full_path": "/ppt/reorder_shape_layer",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於調整幻燈片中的形狀層。透過將形狀層重新排序，使用者可以改變形狀層的顯示順序。",
           "error": null
         },
         {
@@ -260,7 +351,7 @@
           "full_path": "/ppt/delete_textbox",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點用於刪除 PowerPoint 中的文字框，接收 POST 請求，並提供刪除後的檔案路徑和相關資訊。",
+          "summary": "此 API 端點用於刪除 PowerPoint 報表中的文字框。",
           "error": null
         },
         {
@@ -274,7 +365,105 @@
           "full_path": "/ppt/delete_shape",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點是用來刪除演示文稿中的特定形狀，成功後會返回刪除結果和相關信息。",
+          "summary": "此 API 端點用於刪除 PowerPoint 報表中的形狀。",
+          "error": null
+        },
+        {
+          "function": "ppt_delete_shapes",
+          "name": "ppt_delete_shapes",
+          "signature": "ppt_delete_shapes(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/delete_shapes",
+          "full_path": "/ppt/delete_shapes",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於批次刪除 PowerPoint 報表中的形狀。",
+          "error": null
+        },
+        {
+          "function": "ppt_clone_shape_to_slide",
+          "name": "ppt_clone_shape_to_slide",
+          "signature": "ppt_clone_shape_to_slide(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/clone_shape_to_slide",
+          "full_path": "/ppt/clone_shape_to_slide",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點用於複製 PowerPoint 報表中的形狀到目標頁面。",
+          "error": null
+        },
+        {
+          "function": "ppt_clone_shapes_to_slide",
+          "name": "ppt_clone_shapes_to_slide",
+          "signature": "ppt_clone_shapes_to_slide(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/clone_shapes_to_slide",
+          "full_path": "/ppt/clone_shapes_to_slide",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點用於批次複製 PowerPoint 報表中的形狀。",
+          "error": null
+        },
+        {
+          "function": "ppt_group_shapes",
+          "name": "ppt_group_shapes",
+          "signature": "ppt_group_shapes(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/group_shapes",
+          "full_path": "/ppt/group_shapes",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於群組化簡報中的形狀。",
+          "error": null
+        },
+        {
+          "function": "ppt_group_shapes_batch",
+          "name": "ppt_group_shapes_batch",
+          "signature": "ppt_group_shapes_batch(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/group_shapes_batch",
+          "full_path": "/ppt/group_shapes_batch",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於批次處理簡報的形狀組。它接受一個包含簡報檔案路徑和群組形狀的請求，然後對簡報進行操作並將結果儲存到指定的檔案路徑。",
+          "error": null
+        },
+        {
+          "function": "ppt_ungroup_shape",
+          "name": "ppt_ungroup_shape",
+          "signature": "ppt_ungroup_shape(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/ungroup_shape",
+          "full_path": "/ppt/ungroup_shape",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於解群組幻燈片形狀。",
+          "error": null
+        },
+        {
+          "function": "ppt_ungroup_shapes_batch",
+          "name": "ppt_ungroup_shapes_batch",
+          "signature": "ppt_ungroup_shapes_batch(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/ungroup_shapes_batch",
+          "full_path": "/ppt/ungroup_shapes_batch",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於批次解群組形狀，將提供一個 PDF 文件中的多個形狀組合成單獨的形狀。",
           "error": null
         },
         {
@@ -288,7 +477,161 @@
           "full_path": "/ppt/clone_named_shape_from_template",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點的功能是從範本複製指定命名的形狀到幻燈片中。",
+          "summary": "此 API 端點用於從指定的簡報模板中複製命名形狀。",
+          "error": null
+        },
+        {
+          "function": "ppt_slide_animations",
+          "name": "ppt_slide_animations",
+          "signature": "ppt_slide_animations(file_path, slide_index=0)",
+          "methods": [
+            "GET"
+          ],
+          "path": "/ppt/slide_animations",
+          "full_path": "/ppt/slide_animations",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於從指定的 PowerPoint 命令碼檔案中取得滑片動畫效果，提供滑片動畫資料。",
+          "error": null
+        },
+        {
+          "function": "ppt_shape_animations",
+          "name": "ppt_shape_animations",
+          "signature": "ppt_shape_animations(file_path, slide_index=0, shape_id=None, shape_index=None)",
+          "methods": [
+            "GET"
+          ],
+          "path": "/ppt/shape_animations",
+          "full_path": "/ppt/shape_animations",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於從投影片檔案中取得形狀動畫。",
+          "error": null
+        },
+        {
+          "function": "ppt_add_shape_animation",
+          "name": "ppt_add_shape_animation",
+          "signature": "ppt_add_shape_animation(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/add_shape_animation",
+          "full_path": "/ppt/add_shape_animation",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於新增 PowerPoint 報表中的形狀動畫。",
+          "error": null
+        },
+        {
+          "function": "ppt_update_shape_animation",
+          "name": "ppt_update_shape_animation",
+          "signature": "ppt_update_shape_animation(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/update_shape_animation",
+          "full_path": "/ppt/update_shape_animation",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點用於更新 PowerPoint 報表中的形狀動畫。",
+          "error": null
+        },
+        {
+          "function": "ppt_delete_shape_animation",
+          "name": "ppt_delete_shape_animation",
+          "signature": "ppt_delete_shape_animation(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/delete_shape_animation",
+          "full_path": "/ppt/delete_shape_animation",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於刪除 PowerPoint 報表中的形狀動畫。",
+          "error": null
+        },
+        {
+          "function": "ppt_clear_shape_animations",
+          "name": "ppt_clear_shape_animations",
+          "signature": "ppt_clear_shape_animations(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/clear_shape_animations",
+          "full_path": "/ppt/clear_shape_animations",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於清除 PowerPoint 報表中的形狀動畫。",
+          "error": null
+        },
+        {
+          "function": "ppt_clear_slide_animations",
+          "name": "ppt_clear_slide_animations",
+          "signature": "ppt_clear_slide_animations(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/clear_slide_animations",
+          "full_path": "/ppt/clear_slide_animations",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於清除投影片中的動畫。透過提供投影片檔案路徑和滑片索引，該端點可以移除投影片中的動畫效果。",
+          "error": null
+        },
+        {
+          "function": "ppt_reorder_slide_animations",
+          "name": "ppt_reorder_slide_animations",
+          "signature": "ppt_reorder_slide_animations(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/reorder_slide_animations",
+          "full_path": "/ppt/reorder_slide_animations",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於重排投影片動畫。",
+          "error": null
+        },
+        {
+          "function": "ppt_slide_transition",
+          "name": "ppt_slide_transition",
+          "signature": "ppt_slide_transition(file_path, slide_index=0)",
+          "methods": [
+            "GET"
+          ],
+          "path": "/ppt/slide_transition",
+          "full_path": "/ppt/slide_transition",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於從指定的 PowerPoint 命令碼檔案中取得滑片轉場效果。",
+          "error": null
+        },
+        {
+          "function": "ppt_set_slide_transition",
+          "name": "ppt_set_slide_transition",
+          "signature": "ppt_set_slide_transition(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/set_slide_transition",
+          "full_path": "/ppt/set_slide_transition",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於設定投影片轉場效果，允許使用者自定義轉場時間、過渡型別和其他引數。",
+          "error": null
+        },
+        {
+          "function": "ppt_clear_slide_transition",
+          "name": "ppt_clear_slide_transition",
+          "signature": "ppt_clear_slide_transition(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/clear_slide_transition",
+          "full_path": "/ppt/clear_slide_transition",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於清除投影片轉場效果。透過提供投影片檔案路徑、要清除的轉場效果索引以及選擇的輸出檔案路徑（或使用提供的檔案路徑），可以移除投影片中的轉場效果。",
           "error": null
         },
         {
@@ -302,7 +645,7 @@
           "full_path": "/ppt/slide_fonts",
           "router_name": "app",
           "docstring": "",
-          "summary": "此 API 端點用於獲取指定 PPT 檔案中指定投影片的字型資訊。",
+          "summary": "此 API 端點用於從投影片檔案中取得特定投影片的字型資訊。",
           "error": null
         },
         {
@@ -316,7 +659,7 @@
           "full_path": "/ppt/slides_fonts",
           "router_name": "app",
           "docstring": "",
-          "summary": "此 API 端點用於分析 PowerPoint 文件中的幻燈片文本字型。",
+          "summary": "此 API 端點用於檢測簡報檔案中使用的字型。",
           "error": null
         },
         {
@@ -330,7 +673,7 @@
           "full_path": "/ppt/theme_info",
           "router_name": "app",
           "docstring": "讀取簡報佈景主題（theme）相關資訊；底層實作於 dataProcess.ppt_stdio.get_presentation_theme_info。",
-          "summary": "讀取簡報檔案中的佈景主題相關資訊。",
+          "summary": "此 API 端點用於讀取簡報佈景主題（theme）相關資訊。它會開啟指定的簡報文件，並從中提取佈景主題的相關資訊。",
           "error": null
         },
         {
@@ -344,7 +687,7 @@
           "full_path": "/ppt/slide_background",
           "router_name": "app",
           "docstring": "讀取單頁投影片背景；底層實作於 get_slide_background_info。",
-          "summary": "此API端點用於讀取指定投影片的背景，底層實作於get_slide_background_info。",
+          "summary": "此 API 端點用於讀取單頁投影片背景。它接受一個文件路徑作為參數，並可選擇性地提供滑片索引作為預設值。",
           "error": null
         },
         {
@@ -358,7 +701,7 @@
           "full_path": "/ppt/slides_backgrounds",
           "router_name": "app",
           "docstring": "掃描整份簡報各頁背景；底層實作於 scan_presentation_backgrounds。",
-          "summary": "這個 API 端點用於掃描整份簡報各頁的背景，底層實作在 scan_presentation_backgrounds 函數中。",
+          "summary": "此 API 端點用於掃描簡報的每頁背景。",
           "error": null
         },
         {
@@ -372,7 +715,7 @@
           "full_path": "/ppt/save_as",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點用於將 PowerPoint 檔案另存為指定格式。",
+          "summary": "此 API 端點用於另存功課簡報。提供檔案路徑和另存路徑作為參數，並回傳另存成功的訊息。",
           "error": null
         },
         {
@@ -386,7 +729,7 @@
           "full_path": "/ppt/add_blank_slide",
           "router_name": "app",
           "docstring": "",
-          "summary": "此 API 端點用於在 PPT 中新增一頁空白投影片。",
+          "summary": "此 API 端點用於在簡報中新增空白頁面。",
           "error": null
         },
         {
@@ -400,7 +743,7 @@
           "full_path": "/ppt/add_blank_slides",
           "router_name": "app",
           "docstring": "",
-          "summary": "此 API 端點用於在 PowerPoint 檔案中新增多頁空白頁。",
+          "summary": "此 API 端點用於在指定的 PowerPoint 命令列檔案中新增空白頁面。",
           "error": null
         },
         {
@@ -414,7 +757,7 @@
           "full_path": "/ppt/add_text",
           "router_name": "app",
           "docstring": "",
-          "summary": "此API端點用於在PPT中新增文字，接收POST請求，並在指定幻燈片上添加文字後返回結果和更新後的PPT文件路徑。",
+          "summary": "此 API 端點用於在簡報中新增文字內容。",
           "error": null
         },
         {
@@ -428,7 +771,7 @@
           "full_path": "/ppt/add_wordart_like_textbox",
           "router_name": "app",
           "docstring": "",
-          "summary": "此API端點用於在PPT中新增類似WordArt的文字框。",
+          "summary": "此 API 端點用於在簡報中新增類似文字框的 WordArt 元素。",
           "error": null
         },
         {
@@ -442,7 +785,7 @@
           "full_path": "/ppt/update_wordart_text",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點用於更新 PowerPoint 中 WordArt 的文字內容。",
+          "summary": "這個 API 端點用於更新 PowerPoint 呈現軟體 (PPT) 中的 WordArt 文字。透過將提供的新文字和相關引數傳送到該端點，系統會更新指定的 WordArt 對象的文字內容，並返回更新後的檔案路徑和其他相關資訊。",
           "error": null
         },
         {
@@ -456,7 +799,7 @@
           "full_path": "/ppt/add_image",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點的功能是新增圖片到簡報中。",
+          "summary": "此 API 端點用於在簡報中新增圖片。",
           "error": null
         },
         {
@@ -470,7 +813,7 @@
           "full_path": "/ppt/add_table",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點用於在 PPT 中新增表格，接收 POST 請求，並將新增表格的結果返回。",
+          "summary": "此 API 端點用於新增 PowerPoint 報表中的表格，允許客戶端上傳表格檔案並指定要插入的滑板、資料和其他設定。",
           "error": null
         },
         {
@@ -484,7 +827,7 @@
           "full_path": "/ppt/slide_tables",
           "router_name": "app",
           "docstring": "",
-          "summary": "此 API 端點用於檢索指定投影片中的表格資訊。",
+          "summary": "此 API 端點用於從投影片檔案中取得投影片表格的資料，提供方式為 HTTP GET。",
           "error": null
         },
         {
@@ -498,7 +841,7 @@
           "full_path": "/ppt/table_detail",
           "router_name": "app",
           "docstring": "",
-          "summary": "此API端點用於獲取PPT中表格的詳細資訊，包括指定幻燈片上的表格內容。",
+          "summary": "這個 API 端點用於從投影片檔案中取得特定投影片片段的內容。透過提供投影片檔案路徑、投影片索引以及可選的形狀 ID 和形狀索引，該端點可以返回所需投影片片段的內容。",
           "error": null
         },
         {
@@ -512,7 +855,7 @@
           "full_path": "/ppt/update_table_cell",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點提供了更新 PowerPoint 中表格儲存格的功能。",
+          "summary": "此 API 端點用於更新 PowerPoint 儲存格中的文字內容。",
           "error": null
         },
         {
@@ -526,7 +869,7 @@
           "full_path": "/ppt/set_table_cell_style",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個API端點用於設定PowerPoint中表格儲存格的樣式。",
+          "summary": "此 API 端點用於設定 PowerPoint 儲存格樣式。",
           "error": null
         },
         {
@@ -540,7 +883,7 @@
           "full_path": "/ppt/update_table_row",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點的功能是更新演示文稿中表格的一整列資料。",
+          "summary": "此 API 端點用於更新 PowerPoint 呈現的表格行。",
           "error": null
         },
         {
@@ -554,7 +897,7 @@
           "full_path": "/ppt/update_table_column",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點用於更新演示文稿中表格的特定欄位，可指定要更新的幻燈片、欄位索引和文字內容等資訊。",
+          "summary": "此 API 端點用於更新 PowerPoint 呈現片中的表格欄位。",
           "error": null
         },
         {
@@ -568,7 +911,7 @@
           "full_path": "/ppt/set_table_row_style",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點用於設定演示文稿中表格的行樣式，包括字型、大小、粗體、斜體、對齊方式、邊框顏色等設定。",
+          "summary": "此 API 端點用於設定 PowerPoint 報表中表格整列的樣式。",
           "error": null
         },
         {
@@ -582,7 +925,7 @@
           "full_path": "/ppt/set_table_column_style",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點用於設定 PowerPoint 中表格的列樣式，包括字型、大小、粗體、斜體、顏色、對齊等設定。",
+          "summary": "此 API 端點用於設定 PowerPoint 報表中表格的樣式。",
           "error": null
         },
         {
@@ -596,7 +939,7 @@
           "full_path": "/ppt/set_table_row_height",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點用於設定 PowerPoint 中表格的列高。",
+          "summary": "此 API 端點用於設定 PowerPoint 報表的列高。",
           "error": null
         },
         {
@@ -610,7 +953,7 @@
           "full_path": "/ppt/set_table_column_width",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點用於設定 PowerPoint 中表格的欄寬。",
+          "summary": "此 API 端點用於設定簡報檔案的表格欄位寬度。",
           "error": null
         },
         {
@@ -624,7 +967,7 @@
           "full_path": "/ppt/distribute_table_column_widths",
           "router_name": "app",
           "docstring": "",
-          "summary": "此API端點用於將PowerPoint中表格的欄位寬度進行平均分配。",
+          "summary": "此 API 端點用於計算簡報表格的平均欄寬。",
           "error": null
         },
         {
@@ -638,7 +981,7 @@
           "full_path": "/ppt/distribute_table_row_heights",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點用於將 PowerPoint 表格中的行高均勻分配。",
+          "summary": "此 API 端點用於分配簡報表格列高，根據提供的檔案路徑、滑片索引、形狀 ID、形狀索引和列索引等參數，計算和設定簡報表格列高。",
           "error": null
         },
         {
@@ -652,7 +995,7 @@
           "full_path": "/ppt/delete_table",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點的功能是刪除 PPT 中的表格，使用 POST 方法，需要提供表格的相關資訊，成功刪除後會返回相關訊息。",
+          "summary": "此 API 端點用於刪除 PowerPoint 報表中的表格。",
           "error": null
         },
         {
@@ -666,7 +1009,7 @@
           "full_path": "/ppt/rebuild_table_structure",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點的功能是重建演示文稿中表格的結構。接受 POST 請求，使用提供的參數重新構建表格，並返回結果和相關資訊。",
+          "summary": "此 API 端點用於重建簡報的表格結構。",
           "error": null
         },
         {
@@ -680,7 +1023,7 @@
           "full_path": "/ppt/insert_table_row",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點用於在 PowerPoint 中插入表格的一列資料。",
+          "summary": "此 API 端點用於在 PowerPoint 呈現中插入表格行。",
           "error": null
         },
         {
@@ -694,7 +1037,7 @@
           "full_path": "/ppt/delete_table_row",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點用於刪除演示文稿中表格的特定列。",
+          "summary": "此 API 端點用於刪除演示文稿中的表格列。",
           "error": null
         },
         {
@@ -708,7 +1051,7 @@
           "full_path": "/ppt/insert_table_column",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點用於在 PowerPoint 中插入表格欄位，並返回操作結果和相關資訊。",
+          "summary": "此 API 端點用於在投影片中插入表格。",
           "error": null
         },
         {
@@ -722,7 +1065,7 @@
           "full_path": "/ppt/delete_table_column",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點用於刪除演示文稿中表格的欄位。",
+          "summary": "此 API 端點用於刪除演示文稿中的表格欄位。",
           "error": null
         },
         {
@@ -736,7 +1079,21 @@
           "full_path": "/ppt/add_shape",
           "router_name": "app",
           "docstring": "",
-          "summary": "此API端點用於新增簡報中的圖形，接收POST請求，並將新增的圖形資訊返回。",
+          "summary": "此 API 端點用於在簡報中新增圖形，允許客戶端上傳圖像文件並在簡報中插入圖形，並可選擇圖形的填充顏色、線條顏色、字體顏色和其他屬性。",
+          "error": null
+        },
+        {
+          "function": "ppt_add_shapes",
+          "name": "ppt_add_shapes",
+          "signature": "ppt_add_shapes(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/add_shapes",
+          "full_path": "/ppt/add_shapes",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於批次新增 PowerPoint 報表中的形狀。",
           "error": null
         },
         {
@@ -750,7 +1107,7 @@
           "full_path": "/ppt/add_line",
           "router_name": "app",
           "docstring": "",
-          "summary": "此API端點用於在PPT中新增線段，接收POST請求，並返回新增線段的結果和相關信息。",
+          "summary": "此 API 端點用於在簡報中新增線段，其接受 POST 請求並提供簡報文件路徑、線段顏色、投影片索引、線段起點和終點的座標，以及線段寬度和儲存路徑等參數，並返回新增線段的結果和儲存路徑。",
           "error": null
         },
         {
@@ -764,7 +1121,7 @@
           "full_path": "/ppt/add_arrow",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點的功能是新增箭頭到簡報中的指定幻燈片，成功後返回新增箭頭的相關資訊。",
+          "summary": "此 API 端點用於在簡報中新增箭頭。",
           "error": null
         },
         {
@@ -778,7 +1135,7 @@
           "full_path": "/ppt/delete_slide",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點的功能是刪除演示文稿中的特定投影片，並返回刪除後的演示文稿路徑、操作結果、相關資訊和所有投影片清單。",
+          "summary": "此 API 端點用於刪除演示文稿中的特定投影片。透過將投影片的路徑和要刪除的投影片索引傳遞給 API，系統會刪除指定投影片，並返回刪除後的路徑、刪除結果以及投影片的相關資訊。",
           "error": null
         },
         {
@@ -792,7 +1149,7 @@
           "full_path": "/ppt/duplicate_slide",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點的功能是複製 PowerPoint 中的特定投影片，並返回複製後的投影片資訊。",
+          "summary": "此 API 端點用於複製 PowerPoint 呈現的特定投影片。",
           "error": null
         },
         {
@@ -806,7 +1163,7 @@
           "full_path": "/ppt/replace_text",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點用於替換 PowerPoint 文件中的文字內容。",
+          "summary": "此 API 端點用於替換功點演示檔案 (PPT) 中的文字。",
           "error": null
         },
         {
@@ -820,7 +1177,7 @@
           "full_path": "/ppt/add_bullets",
           "router_name": "app",
           "docstring": "",
-          "summary": "此API端點用於新增PowerPoint投影片中的項目符號，並返回操作結果和相關信息。",
+          "summary": "此 API 端點用於在簡報中新增項目符號。",
           "error": null
         },
         {
@@ -834,7 +1191,7 @@
           "full_path": "/ppt/add_title_slide",
           "router_name": "app",
           "docstring": "",
-          "summary": "此API端點用於新增PowerPoint檔案的標題頁。",
+          "summary": "此 API 端點用於新增簡報的標題頁。透過將標題和副標題字串傳送到此端點，系統會在指定的簡報檔案中新增新的標題頁。",
           "error": null
         },
         {
@@ -848,7 +1205,7 @@
           "full_path": "/ppt/reorder_slides",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點用於重新排序幻燈片，接收 POST 請求，並根據請求中提供的新順序重新排列幻燈片。",
+          "summary": "此 API 端點用於重排 PowerPoint 呈現的頁面順序。",
           "error": null
         },
         {
@@ -862,7 +1219,21 @@
           "full_path": "/ppt/set_slides_background_color",
           "router_name": "app",
           "docstring": "",
-          "summary": "此API端點用於設定幻燈片背景顏色，接受POST請求，並可設定多頁幻燈片的背景顏色。",
+          "summary": "此 API 端點用於設定多頁幻燈片的背景顏色。透過將 RGB 顏色值傳送到該端點，系統會將指定的幻燈片背景顏色更改為指定的顏色。",
+          "error": null
+        },
+        {
+          "function": "ppt_set_all_slides_background_color",
+          "name": "ppt_set_all_slides_background_color",
+          "signature": "ppt_set_all_slides_background_color(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/set_all_slides_background_color",
+          "full_path": "/ppt/set_all_slides_background_color",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於為所有幻燈片設定背景顏色。透過將 RGB 顏色值提供給該端點，它會將該顏色應用於幻燈片的背景中。",
           "error": null
         },
         {
@@ -876,7 +1247,21 @@
           "full_path": "/ppt/set_slides_background_image",
           "router_name": "app",
           "docstring": "",
-          "summary": "此API端點用於設定幻燈片的背景圖片，接受POST請求，成功後回傳設定結果及相關資訊。",
+          "summary": "此 API 端點用於設定多頁幻燈片的背景圖片。透過將背景圖片路徑、幻燈片索引和存檔路徑提供給 API，系統可以將指定的背景圖片設定為多頁幻燈片的背景圖片。",
+          "error": null
+        },
+        {
+          "function": "ppt_set_all_slides_background_image",
+          "name": "ppt_set_all_slides_background_image",
+          "signature": "ppt_set_all_slides_background_image(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/ppt/set_all_slides_background_image",
+          "full_path": "/ppt/set_all_slides_background_image",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於為所有投影片套用背景圖片。透過將背景圖片路徑傳遞至 API，系統會開啟指定的投影片文件，並將背景圖片套用至其中。",
           "error": null
         },
         {
@@ -890,7 +1275,7 @@
           "full_path": "/ppt/set_slide_background_color",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點的功能是設定幻燈片的背景顏色。接受 POST 請求，使用指定的幻燈片索引和 RGB 值來設定背景顏色，並返回處理結果和相關資訊。",
+          "summary": "此 API 端點用於設定 PowerPoint 呈現片的背景顏色。透過將提供的 RGB 值應用於指定的投影片頁面，來修改其背景顏色。",
           "error": null
         },
         {
@@ -904,7 +1289,7 @@
           "full_path": "/ppt/set_slide_background_image",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點的功能是設定幻燈片的背景圖片，使用 POST 方法，路徑為 /ppt/set_slide_background_image。",
+          "summary": "此 API 端點用於設定幻燈片的背景圖片。透過將幻燈片檔案、投影片索引和背景圖片路徑傳送到該端點，系統會將背景圖片設定到指定的投影片中，並返回設定後的檔案路徑和設定結果。",
           "error": null
         },
         {
@@ -918,7 +1303,7 @@
           "full_path": "/ppt/render_slide_to_image",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點的功能是將投影片渲染成圖片。",
+          "summary": "此 API 端點用於將 PowerPoint 投影片截圖，將截圖輸出為圖片。",
           "error": null
         },
         {
@@ -932,7 +1317,7 @@
           "full_path": "/ppt/render_slides_to_grid_image",
           "router_name": "app",
           "docstring": "",
-          "summary": "這個 API 端點用於將 PPT 幻燈片渲染成網格圖像，使用 POST 方法，接收請求並處理後返回成功訊息。",
+          "summary": "此 API 端點用於將多張投影片轉換為網格圖片。",
           "error": null
         },
         {
@@ -946,7 +1331,7 @@
           "full_path": "/ppt/parse_math_expression",
           "router_name": "app",
           "docstring": "解析數學公式：默認使用 OMML 路徑，image 模式保持與 M1 兼容。",
-          "summary": "這個 API 端點用於解析數學公式，預設使用 OMML 路徑，並保持與 M1 兼容。",
+          "summary": "此 API 端點用於解析數學公式，預設使用 OMML 路徑，並保持與 M1 的相容性。",
           "error": null
         },
         {
@@ -960,7 +1345,7 @@
           "full_path": "/ppt/add_equation",
           "router_name": "app",
           "docstring": "Add equation: default OMML path, image mode keeps M1 compatibility.",
-          "summary": "此 API 端點用於新增方程式至 PPT 中，支援預設 OMML 路徑，並保持 M1 相容性。",
+          "summary": "這個 API 端點的用途是將一個方程式添加到一個簡報中，並可以選擇使用 OMML 格式來儲存方程式。",
           "error": null
         },
         {
@@ -974,7 +1359,7 @@
           "full_path": "/ppt/update_equation",
           "router_name": "app",
           "docstring": "更新數學公式：默認使用 OMML 路徑，image 模式更新圖像公式。",
-          "summary": "此API端點用於更新數學公式，預設使用OMML格式，並可選擇以圖像模式更新公式。",
+          "summary": "這個 API 端點用於更新數學公式，支援兩種模式：\"omml\" 和 \"image\"。在 \"omml\" 模式下，該公式以 OMML 格式儲存，在 \"image\" 模式下，該公式直接儲存為圖像。",
           "error": null
         },
         {
@@ -988,7 +1373,7 @@
           "full_path": "/ppt/delete_equation",
           "router_name": "app",
           "docstring": "刪除數學公式：默認使用 OMML 路徑，image 模式刪除圖像公式。",
-          "summary": "刪除數學公式的 API 端點，可選擇使用 OMML 路徑或圖像模式刪除公式。",
+          "summary": "此 API 端點用於刪除數學公式，支援兩種模式：OMML路徑和圖像模式。",
           "error": null
         }
       ]
