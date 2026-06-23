@@ -17,8 +17,7 @@
 tmp*
 *pyc*
 *.zip
-**.DS_Store
-**code-workspace**
+**.DS_Store**code-workspace**
 **.claude**
 
 *analysis_result*.json
