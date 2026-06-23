@@ -191,6 +191,53 @@ async def run_parser_pipeline(
     }
     return await _request("POST", "/ppt/run_parser_pipeline", json_body=body)
 
+
+@mcp.tool()
+async def parse_structure(
+    file_path: str,
+    output_path: Optional[str] = None,
+    export_media_dir: Optional[str] = None,
+    no_api: bool = False,
+) -> Dict[str, Any]:
+    """Parse PPTX structure into layout JSON."""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "output_path": output_path,
+        "export_media_dir": export_media_dir,
+        "no_api": no_api,
+    }
+    return await _request("POST", "/ppt/parse_structure", json_body=body)
+
+
+@mcp.tool()
+async def build_from_structure(
+    json_path: str,
+    output_path: Optional[str] = None,
+    dpi: int = 96,
+) -> Dict[str, Any]:
+    """Rebuild PPTX from parsed layout JSON."""
+    body: Dict[str, Any] = {
+        "json_path": json_path,
+        "output_path": output_path,
+        "dpi": dpi,
+    }
+    return await _request("POST", "/ppt/build_from_structure", json_body=body)
+
+
+@mcp.tool()
+async def check_overlap(
+    json_path: str,
+    output_path: Optional[str] = None,
+    only_overlaps: bool = False,
+) -> Dict[str, Any]:
+    """Check shape overlap from parsed layout JSON."""
+    body: Dict[str, Any] = {
+        "json_path": json_path,
+        "output_path": output_path,
+        "only_overlaps": only_overlaps,
+    }
+    return await _request("POST", "/ppt/check_overlap", json_body=body)
+
 @mcp.tool()
 async def new_presentation(
     file_path: str,
@@ -271,6 +318,11 @@ async def add_text(
     font_name: Optional[str] = None,
     font_color: Optional[List[int]] = None,
     align: str = "left",
+    fill_color: Optional[List[int]] = None,
+    fill_transparency: Optional[float] = None,
+    line_style: Optional[str] = None,
+    line_color: Optional[List[int]] = None,
+    line_width: Optional[int] = None,
     save_as: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Add text."""
@@ -288,6 +340,11 @@ async def add_text(
         "font_name": font_name,
         "font_color": _clean_rgb(font_color),
         "align": align,
+        "fill_color": _clean_rgb(fill_color) if fill_color is not None else None,
+        "fill_transparency": fill_transparency,
+        "line_style": line_style,
+        "line_color": _clean_rgb(line_color) if line_color is not None else None,
+        "line_width": line_width,
     }
     if save_as:
         body["save_as"] = save_as
@@ -937,6 +994,37 @@ async def add_shape(
 
 
 @mcp.tool()
+async def add_shapes(
+    file_path: str,
+    slide_index: int,
+    shapes: List[Dict[str, Any]],
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """批次新增形狀（每筆自帶座標與樣式）"""
+    normalized_shapes: List[Dict[str, Any]] = []
+    for idx, spec in enumerate(shapes):
+        if not isinstance(spec, dict):
+            raise ValueError(f"shapes[{idx}] must be an object")
+        item = dict(spec)
+        if "fill_color" in item and item["fill_color"] is not None:
+            item["fill_color"] = _clean_rgb(item["fill_color"])
+        if "line_color" in item and item["line_color"] is not None:
+            item["line_color"] = _clean_rgb(item["line_color"])
+        if "font_color" in item and item["font_color"] is not None:
+            item["font_color"] = _clean_rgb(item["font_color"])
+        normalized_shapes.append(item)
+
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "shapes": normalized_shapes,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/add_shapes", json_body=body)
+
+
+@mcp.tool()
 async def add_line(
     file_path: str,
     slide_index: int,
@@ -1298,6 +1386,45 @@ async def set_textbox_style(
 
 
 @mcp.tool()
+async def set_textbox_text_style(
+    file_path: str,
+    slide_index: int,
+    shape_id: Optional[int] = None,
+    shape_index: Optional[int] = None,
+    font_size: Optional[int] = None,
+    font_name: Optional[str] = None,
+    font_color: Optional[List[int]] = None,
+    bold: Optional[bool] = None,
+    italic: Optional[bool] = None,
+    align: Optional[str] = None,
+    line_spacing: Optional[float] = None,
+    space_before_pt: Optional[float] = None,
+    space_after_pt: Optional[float] = None,
+    paragraph_index: Optional[int] = None,
+    save_as: Optional[str] = None,
+) -> Dict[str, Any]:
+    """設定既有文字框字型與段落間距"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+        "font_size": font_size,
+        "font_name": font_name,
+        "font_color": _clean_rgb(font_color) if font_color is not None else None,
+        "bold": bold,
+        "italic": italic,
+        "align": align,
+        "line_spacing": line_spacing,
+        "space_before_pt": space_before_pt,
+        "space_after_pt": space_after_pt,
+        "paragraph_index": paragraph_index,
+        "save_as": save_as,
+    }
+    return await _request("POST", "/ppt/set_textbox_text_style", json_body=body)
+
+
+@mcp.tool()
 async def drag_shape(
     file_path: str,
     slide_index: int,
@@ -1477,6 +1604,160 @@ async def delete_shape(
     if save_as:
         body["save_as"] = save_as
     return await _request("POST", "/ppt/delete_shape", json_body=body)
+
+
+@mcp.tool()
+async def delete_shapes(
+        file_path: str,
+        slide_index: int,
+        shape_ids: Optional[List[int]] = None,
+        shape_indices: Optional[List[int]] = None,
+        targets: Optional[List[Dict[str, Any]]] = None,
+        save_as: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    """批次刪除多個 shape"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "shape_ids": shape_ids,
+        "shape_indices": shape_indices,
+        "targets": targets,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/delete_shapes", json_body=body)
+
+
+@mcp.tool()
+async def clone_shape_to_slide(
+        file_path: str,
+        source_slide_index: int,
+        target_slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        left: Optional[int] = None,
+        top: Optional[int] = None,
+        delta_x: Optional[int] = None,
+        delta_y: Optional[int] = None,
+        new_text: Optional[str] = None,
+        save_as: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    """複製單一 shape 到目標頁（可調整座標）"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "source_slide_index": source_slide_index,
+        "target_slide_index": target_slide_index,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+        "left": left,
+        "top": top,
+        "delta_x": delta_x,
+        "delta_y": delta_y,
+        "new_text": new_text,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/clone_shape_to_slide", json_body=body)
+
+
+@mcp.tool()
+async def clone_shapes_to_slide(
+        file_path: str,
+        clones: List[Dict[str, Any]],
+        default_source_slide_index: Optional[int] = None,
+        default_target_slide_index: Optional[int] = None,
+        save_as: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    """批次複製多個 shape（每筆可指定來源頁與目標頁）"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "clones": clones,
+        "default_source_slide_index": default_source_slide_index,
+        "default_target_slide_index": default_target_slide_index,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/clone_shapes_to_slide", json_body=body)
+
+
+@mcp.tool()
+async def group_shapes(
+        file_path: str,
+        slide_index: int,
+        shape_ids: Optional[List[int]] = None,
+        shape_indices: Optional[List[int]] = None,
+        targets: Optional[List[Dict[str, Any]]] = None,
+        group_name: Optional[str] = None,
+        save_as: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    """同頁將多個 shape 組成群組"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "shape_ids": shape_ids,
+        "shape_indices": shape_indices,
+        "targets": targets,
+        "group_name": group_name,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/group_shapes", json_body=body)
+
+
+@mcp.tool()
+async def group_shapes_batch(
+        file_path: str,
+        groups: List[Dict[str, Any]],
+        default_slide_index: Optional[int] = None,
+        save_as: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    """批次將多組 shape 做群組化"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "groups": groups,
+        "default_slide_index": default_slide_index,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/group_shapes_batch", json_body=body)
+
+
+@mcp.tool()
+async def ungroup_shape(
+        file_path: str,
+        slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        save_as: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    """解開單一群組 shape"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "slide_index": slide_index,
+        "shape_id": shape_id,
+        "shape_index": shape_index,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/ungroup_shape", json_body=body)
+
+
+@mcp.tool()
+async def ungroup_shapes_batch(
+        file_path: str,
+        items: List[Dict[str, Any]],
+        default_slide_index: Optional[int] = None,
+        save_as: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    """批次解開多個群組 shape"""
+    body: Dict[str, Any] = {
+        "file_path": file_path,
+        "items": items,
+        "default_slide_index": default_slide_index,
+    }
+    if save_as:
+        body["save_as"] = save_as
+    return await _request("POST", "/ppt/ungroup_shapes_batch", json_body=body)
 
 
 @mcp.tool()

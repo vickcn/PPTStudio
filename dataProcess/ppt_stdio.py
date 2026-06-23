@@ -18,6 +18,7 @@ PPTX 核心操作模組
 import os
 import json
 import re
+import logging
 import tempfile
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
@@ -30,6 +31,7 @@ try:
     from pptx import Presentation
     from pptx.util import Inches, Pt, Emu
     from pptx.enum.text import PP_ALIGN
+    from pptx.enum.text import MSO_AUTO_SIZE
     from pptx.dml.color import RGBColor
     from pptx.enum.dml import MSO_LINE_DASH_STYLE
     from pptx.enum.shapes import MSO_AUTO_SHAPE_TYPE
@@ -70,14 +72,15 @@ DEFAULT_DPI = 96
 DEFAULT_FONT_ZH = "微軟正黑體"
 DEFAULT_FONT_EN = "Consolas"
 
-import dataProcess as dp
-from dataProcess import ppt_table_ops as _ppt_table_ops
-from dataProcess import ppt_animation_ops as _ppt_animation_ops
+if __package__ in {None, ""}:
+    import ppt_table_ops as _ppt_table_ops  # type: ignore
+    import ppt_animation_ops as _ppt_animation_ops  # type: ignore
+else:
+    from . import ppt_table_ops as _ppt_table_ops
+    from . import ppt_animation_ops as _ppt_animation_ops
 
-PYTHON_PPTX_AVAILABLE = dp.ptp.PYTHON_PPTX_AVAILABLE
-Presentation = dp.ptp.Presentation
-m_logger = dp.ptp.m_logger
-LOGger = dp.ptp.LOGger
+m_logger = logging.getLogger(__name__)
+LOGger = m_logger
 
 _CONFIG_CACHE: Optional[Dict[str, Any]] = None
 
@@ -376,6 +379,55 @@ def _name_to_dash_style(line_style: Optional[str]) -> Any:
     raise ValueError(f"目前環境不支援 line_style={normalized}")
 
 
+def _normalize_auto_fit(auto_fit: Optional[str]) -> Any:
+    if auto_fit is None:
+        return None
+
+    normalized = str(auto_fit).strip().lower()
+    if not normalized or normalized == "none":
+        return MSO_AUTO_SIZE.NONE
+
+    candidates: Dict[str, List[str]] = {
+        "shrink_text": ["TEXT_TO_FIT_SHAPE", "TEXT_TO_FIT", "SHRINK_TEXT", "SHRINK", "FIT_TEXT"],
+        "text_to_fit_shape": ["TEXT_TO_FIT_SHAPE", "TEXT_TO_FIT", "SHRINK_TEXT", "SHRINK", "FIT_TEXT"],
+        "shape_to_fit_text": ["SHAPE_TO_FIT_TEXT", "GROW_TEXT", "GROW", "EXPAND"],
+    }
+    if normalized not in candidates:
+        raise ValueError("auto_fit 必須是 none / shrink_text / text_to_fit_shape / shape_to_fit_text")
+
+    for enum_name in candidates[normalized]:
+        enum_val = getattr(MSO_AUTO_SIZE, enum_name, None)
+        if enum_val is not None:
+            return enum_val
+    raise ValueError(f"目前環境不支援 auto_fit={normalized}")
+
+
+def _apply_text_frame_layout(text_frame: Any, word_wrap: Optional[bool] = None, auto_fit: Optional[str] = None) -> None:
+    if word_wrap is not None:
+        text_frame.word_wrap = bool(word_wrap)
+    if auto_fit is not None:
+        text_frame.auto_size = _normalize_auto_fit(auto_fit)
+
+
+def _xml_local_name(tag: Any) -> str:
+    return str(tag).split("}", 1)[-1]
+
+
+def _extract_cnvpr_meta(shape_el: Any) -> Dict[str, Any]:
+    result = {"shape_id": None, "shape_name": None}
+    try:
+        cnv_nodes = shape_el.xpath(".//*[local-name()='cNvPr'][1]")
+        if not cnv_nodes:
+            return result
+        cnv = cnv_nodes[0]
+        raw_id = cnv.get("id")
+        result["shape_id"] = int(raw_id) if raw_id is not None else None
+        result["shape_name"] = cnv.get("name")
+    except Exception:
+        return result
+    return result
+
+
 class PPTDocument:
     """
     封裝一個 Presentation 物件，提供可操作方法
@@ -426,8 +478,19 @@ class PPTDocument:
             font_name: Optional[str] = None,
             font_color: Optional[Tuple[int, int, int]] = None,
             align: str = "left",
+            fill_color: Optional[Tuple[int, int, int]] = None,
+            fill_transparency: Optional[float] = None,
+            line_style: Optional[str] = None,
+            line_color: Optional[Tuple[int, int, int]] = None,
+            line_width: Optional[int] = None,
+            word_wrap: Optional[bool] = None,
+            auto_fit: Optional[str] = None,
         ) -> Dict[str, Any]:
         _validate_slide_index(self.prs, slide_index)
+        if fill_transparency is not None and not (0.0 <= float(fill_transparency) <= 1.0):
+            raise ValueError("fill_transparency 必須介於 0.0 ~ 1.0")
+        if line_width is not None and int(line_width) < 0:
+            raise ValueError("line_width 不可小於 0")
         slide = self.prs.slides[slide_index]
         resolved_font_name = _resolve_font_name(font_name)
         default_zh_font, default_en_font = _get_default_fonts()
@@ -443,6 +506,7 @@ class PPTDocument:
 
         tf = shape.text_frame
         tf.clear()
+        _apply_text_frame_layout(tf, word_wrap=word_wrap, auto_fit=auto_fit)
 
         p = tf.paragraphs[0]
         p.text = text or ""
@@ -469,6 +533,23 @@ class PPTDocument:
             if color:
                 run.font.color.rgb = color
 
+        if fill_color is not None or fill_transparency is not None:
+            shape.fill.solid()
+            if fill_color is not None:
+                shape.fill.fore_color.rgb = _rgb_tuple_to_color(fill_color)
+            if fill_transparency is not None:
+                try:
+                    _write_fill_transparency_to_xml(shape, float(fill_transparency))
+                except Exception:
+                    shape.fill.transparency = float(fill_transparency)
+
+        if line_color is not None:
+            shape.line.color.rgb = _rgb_tuple_to_color(line_color)
+        if line_width is not None:
+            shape.line.width = Emu(int(line_width))
+        if line_style is not None:
+            shape.line.dash_style = _name_to_dash_style(line_style)
+
         return {
             "slide_index": slide_index,
             "shape_id": shape.shape_id,
@@ -477,6 +558,8 @@ class PPTDocument:
             "top": top,
             "width": width,
             "height": height,
+            "word_wrap": word_wrap,
+            "auto_fit": auto_fit,
         }
 
     def add_image(
@@ -488,6 +571,11 @@ class PPTDocument:
             width: Optional[int] = None,
             height: Optional[int] = None,
             keep_aspect_ratio: bool = True,
+            rotation: Optional[float] = None,
+            crop_left: Optional[float] = None,
+            crop_right: Optional[float] = None,
+            crop_top: Optional[float] = None,
+            crop_bottom: Optional[float] = None,
         ) -> Dict[str, Any]:
         _validate_slide_index(self.prs, slide_index)
 
@@ -526,6 +614,17 @@ class PPTDocument:
 
         picture = slide.shapes.add_picture(**kwargs)
 
+        if rotation is not None:
+            picture.rotation = float(rotation)
+        if crop_left is not None:
+            picture.crop_left = float(crop_left)
+        if crop_right is not None:
+            picture.crop_right = float(crop_right)
+        if crop_top is not None:
+            picture.crop_top = float(crop_top)
+        if crop_bottom is not None:
+            picture.crop_bottom = float(crop_bottom)
+
         return {
             "slide_index": slide_index,
             "shape_id": picture.shape_id,
@@ -534,6 +633,11 @@ class PPTDocument:
             "top": top,
             "width": picture.width,
             "height": picture.height,
+            "rotation": picture.rotation,
+            "crop_left": picture.crop_left,
+            "crop_right": picture.crop_right,
+            "crop_top": picture.crop_top,
+            "crop_bottom": picture.crop_bottom,
         }
 
     def add_table(
@@ -671,6 +775,58 @@ class PPTDocument:
             "top": top,
             "width": width,
             "height": height,
+        }
+
+    def add_shapes(
+            self,
+            slide_index: int,
+            shapes: List[Dict[str, Any]],
+        ) -> Dict[str, Any]:
+        _validate_slide_index(self.prs, slide_index)
+        if not shapes:
+            raise ValueError("shapes 不可為空")
+
+        def _to_rgb_tuple(value: Any, field_name: str, item_index: int) -> Optional[Tuple[int, int, int]]:
+            if value is None:
+                return None
+            if not isinstance(value, (list, tuple)) or len(value) != 3:
+                raise ValueError(f"shapes[{item_index}].{field_name} 必須是 [R, G, B]")
+            return (int(value[0]), int(value[1]), int(value[2]))
+
+        added_results: List[Dict[str, Any]] = []
+        for idx, spec in enumerate(shapes):
+            if not isinstance(spec, dict):
+                raise ValueError(f"shapes[{idx}] 必須是 object")
+
+            required = ["shape_type", "left", "top", "width", "height"]
+            missing = [k for k in required if k not in spec]
+            if missing:
+                raise ValueError(f"shapes[{idx}] 缺少必要欄位: {missing}")
+
+            result = self.add_shape(
+                slide_index=slide_index,
+                shape_type=str(spec["shape_type"]),
+                left=int(spec["left"]),
+                top=int(spec["top"]),
+                width=int(spec["width"]),
+                height=int(spec["height"]),
+                text="" if spec.get("text") is None else str(spec.get("text", "")),
+                fill_color=_to_rgb_tuple(spec.get("fill_color"), "fill_color", idx),
+                line_color=_to_rgb_tuple(spec.get("line_color"), "line_color", idx),
+                line_width=int(spec["line_width"]) if spec.get("line_width") is not None else None,
+                font_size=int(spec.get("font_size", 18)),
+                bold=bool(spec.get("bold", False)),
+                font_name=spec.get("font_name"),
+                font_color=_to_rgb_tuple(spec.get("font_color"), "font_color", idx),
+            )
+            result["item_index"] = idx
+            added_results.append(result)
+
+        return {
+            "slide_index": slide_index,
+            "requested_count": len(shapes),
+            "added_count": len(added_results),
+            "shapes": added_results,
         }
     
     def add_line(
@@ -1078,6 +1234,119 @@ class PPTDocument:
         result["notes"].extend(notes)
         return result
 
+    def set_textbox_text_style(
+            self,
+            slide_index: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+            font_size: Optional[int] = None,
+            font_name: Optional[str] = None,
+            font_color: Optional[Tuple[int, int, int]] = None,
+            bold: Optional[bool] = None,
+            italic: Optional[bool] = None,
+            align: Optional[str] = None,
+            line_spacing: Optional[float] = None,
+            space_before_pt: Optional[float] = None,
+            space_after_pt: Optional[float] = None,
+            paragraph_index: Optional[int] = None,
+            word_wrap: Optional[bool] = None,
+            auto_fit: Optional[str] = None,
+        ) -> Dict[str, Any]:
+        shape, resolved_shape_index = self._get_textbox_shape(
+            slide_index=slide_index,
+            shape_id=shape_id,
+            shape_index=shape_index,
+        )
+
+        if font_size is not None and int(font_size) <= 0:
+            raise ValueError("font_size 必須 > 0")
+        if line_spacing is not None and float(line_spacing) <= 0:
+            raise ValueError("line_spacing 必須 > 0")
+        if space_before_pt is not None and float(space_before_pt) < 0:
+            raise ValueError("space_before_pt 不可小於 0")
+        if space_after_pt is not None and float(space_after_pt) < 0:
+            raise ValueError("space_after_pt 不可小於 0")
+
+        resolved_font_name = _resolve_font_name(font_name) if font_name is not None else None
+        color = _rgb_tuple_to_color(font_color)
+
+        text_frame = shape.text_frame
+        _apply_text_frame_layout(text_frame, word_wrap=word_wrap, auto_fit=auto_fit)
+        paragraphs = list(text_frame.paragraphs)
+        if paragraph_index is not None:
+            if paragraph_index < 0 or paragraph_index >= len(paragraphs):
+                raise IndexError(f"paragraph_index 超出範圍: {paragraph_index}, paragraph_count={len(paragraphs)}")
+            target_paragraphs = [paragraphs[paragraph_index]]
+        else:
+            target_paragraphs = paragraphs
+
+        align_map = {
+            "left": PP_ALIGN.LEFT,
+            "center": PP_ALIGN.CENTER,
+            "right": PP_ALIGN.RIGHT,
+            "justify": PP_ALIGN.JUSTIFY,
+        }
+        align_key = (align or "").strip().lower()
+        if align is not None and align_key not in align_map:
+            raise ValueError("align 僅支援: left / center / right / justify")
+
+        changed_runs = 0
+        notes: List[str] = []
+        for paragraph in target_paragraphs:
+            if align is not None:
+                paragraph.alignment = align_map[align_key]
+            if line_spacing is not None:
+                paragraph.line_spacing = float(line_spacing)
+            if space_before_pt is not None:
+                paragraph.space_before = Pt(float(space_before_pt))
+            if space_after_pt is not None:
+                paragraph.space_after = Pt(float(space_after_pt))
+
+            if len(paragraph.runs) == 0 and (paragraph.text or "").strip():
+                # 無 run 的段落改以 text 重新寫回，讓 run 建立後可套字型。
+                paragraph.text = paragraph.text or ""
+            for run in paragraph.runs:
+                if font_size is not None:
+                    run.font.size = Pt(int(font_size))
+                if resolved_font_name is not None:
+                    run.font.name = resolved_font_name
+                if color is not None:
+                    run.font.color.rgb = color
+                if bold is not None:
+                    run.font.bold = bool(bold)
+                if italic is not None:
+                    run.font.italic = bool(italic)
+                changed_runs += 1
+
+        if changed_runs == 0:
+            notes.append("目標段落沒有可套用字型屬性的 runs。")
+
+        return {
+            "slide_index": slide_index,
+            "shape_index": resolved_shape_index,
+            "shape_id": getattr(shape, "shape_id", None),
+            "name": getattr(shape, "name", None),
+            "text_preview": (shape.text_frame.text or "").strip()[:120],
+            "paragraph_count": len(paragraphs),
+            "applied_paragraph_count": len(target_paragraphs),
+            "changed_run_count": changed_runs,
+            "applied": {
+                "font_size": int(font_size) if font_size is not None else None,
+                "font_name": resolved_font_name,
+                "font_color": [int(font_color[0]), int(font_color[1]), int(font_color[2])] if font_color is not None else None,
+                "bold": bold,
+                "italic": italic,
+                "align": align_key if align is not None else None,
+                "line_spacing": float(line_spacing) if line_spacing is not None else None,
+                "space_before_pt": float(space_before_pt) if space_before_pt is not None else None,
+                "space_after_pt": float(space_after_pt) if space_after_pt is not None else None,
+                "paragraph_index": paragraph_index,
+                "word_wrap": word_wrap,
+                "auto_fit": auto_fit,
+            },
+            "notes": notes,
+        }
+
     def drag_shape(
             self,
             slide_index: int,
@@ -1212,6 +1481,233 @@ class PPTDocument:
             "deleted_name": deleted_name,
             "deleted_text_preview": deleted_text_preview,
             "remaining_shape_count": len(self.prs.slides[slide_index].shapes),
+        }
+
+    def delete_shapes(
+            self,
+            slide_index: int,
+            shape_ids: Optional[List[int]] = None,
+            shape_indices: Optional[List[int]] = None,
+            targets: Optional[List[Dict[str, Any]]] = None,
+        ) -> Dict[str, Any]:
+        _validate_slide_index(self.prs, slide_index)
+
+        pending_targets: List[Dict[str, Optional[int]]] = []
+        for shape_id in shape_ids or []:
+            pending_targets.append({"shape_id": int(shape_id), "shape_index": None})
+        for shape_index in shape_indices or []:
+            pending_targets.append({"shape_id": None, "shape_index": int(shape_index)})
+        for target in targets or []:
+            if not isinstance(target, dict):
+                raise ValueError("targets 每個項目都必須是 object")
+            sid = target.get("shape_id")
+            sidx = target.get("shape_index")
+            if sid is None and sidx is None:
+                raise ValueError("targets 項目必須至少提供 shape_id 或 shape_index")
+            pending_targets.append(
+                {
+                    "shape_id": int(sid) if sid is not None else None,
+                    "shape_index": int(sidx) if sidx is not None else None,
+                }
+            )
+
+        if not pending_targets:
+            raise ValueError("至少需提供 shape_ids / shape_indices / targets 其中之一")
+
+        resolved: List[Tuple[Any, int]] = []
+        seen_keys = set()
+        for target in pending_targets:
+            shape, resolved_shape_index = self._get_shape(
+                slide_index=slide_index,
+                shape_id=target["shape_id"],
+                shape_index=target["shape_index"],
+            )
+            shape_id = getattr(shape, "shape_id", None)
+            dedupe_key = ("shape_id", int(shape_id)) if shape_id is not None else ("shape_index", int(resolved_shape_index))
+            if dedupe_key in seen_keys:
+                continue
+            seen_keys.add(dedupe_key)
+            resolved.append((shape, resolved_shape_index))
+
+        deleted_shapes: List[Dict[str, Any]] = []
+        for shape, resolved_shape_index in resolved:
+            deleted_shape_id = getattr(shape, "shape_id", None)
+            deleted_name = getattr(shape, "name", None)
+            deleted_shape_type = str(getattr(shape, "shape_type", ""))
+            deleted_text_preview = None
+            if getattr(shape, "has_text_frame", False):
+                try:
+                    deleted_text_preview = (shape.text_frame.text or "").strip()[:120]
+                except Exception:
+                    deleted_text_preview = None
+
+            element = shape._element
+            parent = element.getparent()
+            if parent is None:
+                raise RuntimeError("找不到 shape parent，無法刪除")
+            parent.remove(element)
+
+            deleted_shapes.append(
+                {
+                    "deleted_shape_index": resolved_shape_index,
+                    "deleted_shape_id": deleted_shape_id,
+                    "deleted_name": deleted_name,
+                    "deleted_shape_type": deleted_shape_type,
+                    "deleted_text_preview": deleted_text_preview,
+                }
+            )
+
+        return {
+            "slide_index": slide_index,
+            "requested_count": len(pending_targets),
+            "deleted_count": len(deleted_shapes),
+            "deleted_shapes": deleted_shapes,
+            "remaining_shape_count": len(self.prs.slides[slide_index].shapes),
+        }
+
+    def clone_shape_to_slide(
+            self,
+            source_slide_index: int,
+            target_slide_index: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+            left: Optional[int] = None,
+            top: Optional[int] = None,
+            delta_x: Optional[int] = None,
+            delta_y: Optional[int] = None,
+            new_text: Optional[str] = None,
+        ) -> Dict[str, Any]:
+        _validate_slide_index(self.prs, source_slide_index)
+        _validate_slide_index(self.prs, target_slide_index)
+
+        source_shape, source_shape_index = self._get_shape(
+            slide_index=source_slide_index,
+            shape_id=shape_id,
+            shape_index=shape_index,
+        )
+        source_bbox = {
+            "left": int(source_shape.left),
+            "top": int(source_shape.top),
+            "width": int(source_shape.width),
+            "height": int(source_shape.height),
+        }
+
+        target_slide = self.prs.slides[target_slide_index]
+        before_count = len(target_slide.shapes)
+        new_el = deepcopy(source_shape._element)
+        target_slide.shapes._spTree.insert_element_before(new_el, "p:extLst")
+        if len(target_slide.shapes) <= before_count:
+            raise RuntimeError("shape 複製失敗：新增後 shape 數量未增加")
+
+        cloned_shape = target_slide.shapes[before_count]
+        cloned_shape_index = before_count
+
+        dx = int(delta_x) if delta_x is not None else 0
+        dy = int(delta_y) if delta_y is not None else 0
+        target_left = int(left) if left is not None else source_bbox["left"] + dx
+        target_top = int(top) if top is not None else source_bbox["top"] + dy
+        if target_left < 0:
+            raise ValueError("left 不可小於 0")
+        if target_top < 0:
+            raise ValueError("top 不可小於 0")
+
+        cloned_shape.left = Emu(target_left)
+        cloned_shape.top = Emu(target_top)
+
+        notes: List[str] = []
+        if source_slide_index != target_slide_index:
+            notes.append("跨頁複製採用 OOXML deepcopy；含外部關聯的 shape 請人工驗證。")
+
+        if new_text is not None:
+            if getattr(cloned_shape, "has_text_frame", False):
+                tf = cloned_shape.text_frame
+                paragraphs = list(tf.paragraphs)
+                target_text = str(new_text)
+                if len(paragraphs) == 0:
+                    tf.text = target_text
+                else:
+                    first_paragraph = paragraphs[0]
+                    first_runs = list(first_paragraph.runs)
+                    if len(first_runs) > 0:
+                        first_runs[0].text = target_text
+                        for run in first_runs[1:]:
+                            run.text = ""
+                    else:
+                        first_paragraph.text = target_text
+                    for paragraph in paragraphs[1:]:
+                        for run in paragraph.runs:
+                            run.text = ""
+                        if len(paragraph.runs) == 0:
+                            paragraph.text = ""
+            else:
+                notes.append("new_text 已提供，但複製出的 shape 沒有 text_frame。")
+
+        after_bbox = {
+            "left": int(cloned_shape.left),
+            "top": int(cloned_shape.top),
+            "width": int(cloned_shape.width),
+            "height": int(cloned_shape.height),
+        }
+
+        return {
+            "source_slide_index": source_slide_index,
+            "target_slide_index": target_slide_index,
+            "source_shape_index": source_shape_index,
+            "source_shape_id": getattr(source_shape, "shape_id", None),
+            "source_shape_name": getattr(source_shape, "name", None),
+            "cloned_shape_index": cloned_shape_index,
+            "cloned_shape_id": getattr(cloned_shape, "shape_id", None),
+            "cloned_shape_name": getattr(cloned_shape, "name", None),
+            "source_bbox": source_bbox,
+            "after_bbox": after_bbox,
+            "new_text": new_text,
+            "notes": notes,
+        }
+
+    def clone_shapes_to_slide(
+            self,
+            clones: List[Dict[str, Any]],
+            default_source_slide_index: Optional[int] = None,
+            default_target_slide_index: Optional[int] = None,
+        ) -> Dict[str, Any]:
+        if not clones:
+            raise ValueError("clones 不可為空")
+
+        results: List[Dict[str, Any]] = []
+        for idx, spec in enumerate(clones):
+            if not isinstance(spec, dict):
+                raise ValueError(f"clones[{idx}] 必須是 object")
+
+            source_slide_value = spec.get("source_slide_index", default_source_slide_index)
+            if source_slide_value is None:
+                raise ValueError(f"clones[{idx}] 缺少 source_slide_index，且未提供 default_source_slide_index")
+            target_slide_value = spec.get("target_slide_index", default_target_slide_index)
+            if target_slide_value is None:
+                target_slide_value = source_slide_value
+
+            sid = spec.get("shape_id")
+            sidx = spec.get("shape_index")
+            if sid is None and sidx is None:
+                raise ValueError(f"clones[{idx}] 需至少提供 shape_id 或 shape_index")
+
+            item_result = self.clone_shape_to_slide(
+                source_slide_index=int(source_slide_value),
+                target_slide_index=int(target_slide_value),
+                shape_id=int(sid) if sid is not None else None,
+                shape_index=int(sidx) if sidx is not None else None,
+                left=int(spec["left"]) if spec.get("left") is not None else None,
+                top=int(spec["top"]) if spec.get("top") is not None else None,
+                delta_x=int(spec["delta_x"]) if spec.get("delta_x") is not None else None,
+                delta_y=int(spec["delta_y"]) if spec.get("delta_y") is not None else None,
+                new_text=spec.get("new_text"),
+            )
+            item_result["item_index"] = idx
+            results.append(item_result)
+
+        return {
+            "requested_count": len(clones),
+            "cloned_count": len(results),
+            "items": results,
         }
 
     def get_slide_animations(self, slide_index: int) -> Dict[str, Any]:
@@ -1610,6 +2106,399 @@ class PPTDocument:
             "after_shape_index": after_shape_index,
             "before_xml_index": before_xml_index,
             "after_xml_index": after_xml_index,
+        }
+
+    def group_shapes(
+            self,
+            slide_index: int,
+            shape_ids: Optional[List[int]] = None,
+            shape_indices: Optional[List[int]] = None,
+            targets: Optional[List[Dict[str, Any]]] = None,
+            group_name: Optional[str] = None,
+        ) -> Dict[str, Any]:
+        _validate_slide_index(self.prs, slide_index)
+        slide = self.prs.slides[slide_index]
+        sp_tree = slide.shapes._spTree
+
+        pending_targets: List[Dict[str, Optional[int]]] = []
+        for sid in shape_ids or []:
+            pending_targets.append({"shape_id": int(sid), "shape_index": None})
+        for sidx in shape_indices or []:
+            pending_targets.append({"shape_id": None, "shape_index": int(sidx)})
+        for target in targets or []:
+            if not isinstance(target, dict):
+                raise ValueError("targets 每個項目都必須是 object")
+            sid = target.get("shape_id")
+            sidx = target.get("shape_index")
+            if sid is None and sidx is None:
+                raise ValueError("targets 項目必須至少提供 shape_id 或 shape_index")
+            pending_targets.append(
+                {
+                    "shape_id": int(sid) if sid is not None else None,
+                    "shape_index": int(sidx) if sidx is not None else None,
+                }
+            )
+        if not pending_targets:
+            raise ValueError("至少需提供 shape_ids / shape_indices / targets 其中之一")
+
+        resolved: List[Tuple[Any, int]] = []
+        seen = set()
+        for target in pending_targets:
+            shape, resolved_shape_index = self._get_shape(
+                slide_index=slide_index,
+                shape_id=target["shape_id"],
+                shape_index=target["shape_index"],
+            )
+            sid = getattr(shape, "shape_id", None)
+            dedupe_key = ("shape_id", int(sid)) if sid is not None else ("shape_index", int(resolved_shape_index))
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+            resolved.append((shape, resolved_shape_index))
+
+        if len(resolved) < 2:
+            raise ValueError("群組至少需要 2 個 shape")
+
+        children = list(sp_tree)
+        min_xml_index = 0
+        grp_tag = qn("p:grpSpPr")
+        for idx, child in enumerate(children):
+            if child.tag == grp_tag:
+                min_xml_index = idx + 1
+                break
+
+        xml_records: List[Dict[str, Any]] = []
+        min_left = None
+        min_top = None
+        max_right = None
+        max_bottom = None
+        for shape, resolved_shape_index in resolved:
+            el = shape.element
+            try:
+                xml_index = children.index(el)
+            except ValueError:
+                raise ValueError("找不到目標 shape 的 XML 節點，無法群組")
+            if xml_index < min_xml_index:
+                raise ValueError("目標 shape 不在可調整圖層範圍，無法群組")
+
+            left = int(getattr(shape, "left", 0))
+            top = int(getattr(shape, "top", 0))
+            width = int(getattr(shape, "width", 0))
+            height = int(getattr(shape, "height", 0))
+            right = left + width
+            bottom = top + height
+            min_left = left if min_left is None else min(min_left, left)
+            min_top = top if min_top is None else min(min_top, top)
+            max_right = right if max_right is None else max(max_right, right)
+            max_bottom = bottom if max_bottom is None else max(max_bottom, bottom)
+
+            xml_records.append(
+                {
+                    "shape": shape,
+                    "shape_index": resolved_shape_index,
+                    "xml_index": xml_index,
+                    "element": el,
+                    "shape_id": getattr(shape, "shape_id", None),
+                    "shape_name": getattr(shape, "name", None),
+                }
+            )
+
+        assert min_left is not None and min_top is not None and max_right is not None and max_bottom is not None
+        group_left = int(min_left)
+        group_top = int(min_top)
+        group_width = max(1, int(max_right - min_left))
+        group_height = max(1, int(max_bottom - min_top))
+
+        xml_records.sort(key=lambda item: int(item["xml_index"]))
+        insert_index = int(xml_records[0]["xml_index"])
+
+        max_cnvpr_id = 0
+        try:
+            for cnv in slide._element.xpath(".//*[local-name()='cNvPr']"):
+                raw = cnv.get("id")
+                if raw is None:
+                    continue
+                try:
+                    max_cnvpr_id = max(max_cnvpr_id, int(raw))
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        group_shape_id = max_cnvpr_id + 1
+        group_display_name = (group_name or "").strip() or f"Group {group_shape_id}"
+
+        grp_sp = OxmlElement("p:grpSp")
+        nv_grp_sp_pr = OxmlElement("p:nvGrpSpPr")
+        c_nv_pr = OxmlElement("p:cNvPr")
+        c_nv_pr.set("id", str(group_shape_id))
+        c_nv_pr.set("name", group_display_name)
+        c_nv_grp_sp_pr = OxmlElement("p:cNvGrpSpPr")
+        nv_pr = OxmlElement("p:nvPr")
+        nv_grp_sp_pr.append(c_nv_pr)
+        nv_grp_sp_pr.append(c_nv_grp_sp_pr)
+        nv_grp_sp_pr.append(nv_pr)
+        grp_sp.append(nv_grp_sp_pr)
+
+        grp_sp_pr = OxmlElement("p:grpSpPr")
+        xfrm = OxmlElement("a:xfrm")
+        off = OxmlElement("a:off")
+        off.set("x", str(group_left))
+        off.set("y", str(group_top))
+        ext = OxmlElement("a:ext")
+        ext.set("cx", str(group_width))
+        ext.set("cy", str(group_height))
+        ch_off = OxmlElement("a:chOff")
+        ch_off.set("x", str(group_left))
+        ch_off.set("y", str(group_top))
+        ch_ext = OxmlElement("a:chExt")
+        ch_ext.set("cx", str(group_width))
+        ch_ext.set("cy", str(group_height))
+        xfrm.append(off)
+        xfrm.append(ext)
+        xfrm.append(ch_off)
+        xfrm.append(ch_ext)
+        grp_sp_pr.append(xfrm)
+        grp_sp.append(grp_sp_pr)
+
+        for record in reversed(xml_records):
+            sp_tree.remove(record["element"])
+        for record in xml_records:
+            grp_sp.append(record["element"])
+
+        sp_tree.insert(insert_index, grp_sp)
+
+        group_shape_index = None
+        for idx, candidate in enumerate(slide.shapes):
+            if candidate.element is grp_sp:
+                group_shape_index = idx
+                break
+
+        return {
+            "slide_index": slide_index,
+            "grouped_count": len(xml_records),
+            "group_shape_id": group_shape_id,
+            "group_shape_name": group_display_name,
+            "group_shape_index": group_shape_index,
+            "group_bbox": {
+                "left": group_left,
+                "top": group_top,
+                "width": group_width,
+                "height": group_height,
+            },
+            "source_shapes": [
+                {
+                    "shape_id": record["shape_id"],
+                    "shape_index": record["shape_index"],
+                    "shape_name": record["shape_name"],
+                }
+                for record in xml_records
+            ],
+            "notes": [],
+        }
+
+    def group_shapes_batch(
+            self,
+            groups: List[Dict[str, Any]],
+            default_slide_index: Optional[int] = None,
+        ) -> Dict[str, Any]:
+        if not groups:
+            raise ValueError("groups 不可為空")
+
+        results: List[Dict[str, Any]] = []
+        for idx, spec in enumerate(groups):
+            if not isinstance(spec, dict):
+                raise ValueError(f"groups[{idx}] 必須是 object")
+            slide_value = spec.get("slide_index", default_slide_index)
+            if slide_value is None:
+                raise ValueError(f"groups[{idx}] 缺少 slide_index，且未提供 default_slide_index")
+
+            result = self.group_shapes(
+                slide_index=int(slide_value),
+                shape_ids=[int(v) for v in (spec.get("shape_ids") or [])],
+                shape_indices=[int(v) for v in (spec.get("shape_indices") or [])],
+                targets=spec.get("targets"),
+                group_name=spec.get("group_name"),
+            )
+            result["item_index"] = idx
+            results.append(result)
+
+        return {
+            "requested_count": len(groups),
+            "grouped_count": len(results),
+            "items": results,
+        }
+
+    def ungroup_shape(
+            self,
+            slide_index: int,
+            shape_id: Optional[int] = None,
+            shape_index: Optional[int] = None,
+        ) -> Dict[str, Any]:
+        _validate_slide_index(self.prs, slide_index)
+        slide = self.prs.slides[slide_index]
+        sp_tree = slide.shapes._spTree
+        shape, resolved_shape_index = self._get_shape(
+            slide_index=slide_index,
+            shape_id=shape_id,
+            shape_index=shape_index,
+        )
+        group_el = shape.element
+        if _xml_local_name(group_el.tag) != "grpSp":
+            raise ValueError("指定 shape 不是群組（grpSp）")
+
+        def _safe_int(node: Any, attr: str, default: int = 0) -> int:
+            if node is None:
+                return default
+            raw = node.get(attr)
+            if raw is None:
+                return default
+            try:
+                return int(raw)
+            except Exception:
+                return default
+
+        def _find_xfrm(shape_el: Any) -> Optional[Any]:
+            local = _xml_local_name(shape_el.tag)
+            if local == "grpSp":
+                grp_sp_pr = shape_el.find(qn("p:grpSpPr"))
+                if grp_sp_pr is None:
+                    return None
+                return grp_sp_pr.find(qn("a:xfrm"))
+            if local in {"sp", "pic", "cxnSp"}:
+                sp_pr = shape_el.find(qn("p:spPr"))
+                if sp_pr is None:
+                    return None
+                return sp_pr.find(qn("a:xfrm"))
+            if local == "graphicFrame":
+                return shape_el.find(qn("p:xfrm"))
+            return None
+
+        group_xfrm = _find_xfrm(group_el)
+        g_off_x = _safe_int(group_xfrm.find(qn("a:off")) if group_xfrm is not None else None, "x", 0)
+        g_off_y = _safe_int(group_xfrm.find(qn("a:off")) if group_xfrm is not None else None, "y", 0)
+        g_ext_cx = _safe_int(group_xfrm.find(qn("a:ext")) if group_xfrm is not None else None, "cx", 1)
+        g_ext_cy = _safe_int(group_xfrm.find(qn("a:ext")) if group_xfrm is not None else None, "cy", 1)
+        g_ch_off_x = _safe_int(group_xfrm.find(qn("a:chOff")) if group_xfrm is not None else None, "x", g_off_x)
+        g_ch_off_y = _safe_int(group_xfrm.find(qn("a:chOff")) if group_xfrm is not None else None, "y", g_off_y)
+        g_ch_ext_cx = _safe_int(group_xfrm.find(qn("a:chExt")) if group_xfrm is not None else None, "cx", g_ext_cx)
+        g_ch_ext_cy = _safe_int(group_xfrm.find(qn("a:chExt")) if group_xfrm is not None else None, "cy", g_ext_cy)
+        sx = (float(g_ext_cx) / float(g_ch_ext_cx)) if g_ch_ext_cx else 1.0
+        sy = (float(g_ext_cy) / float(g_ch_ext_cy)) if g_ch_ext_cy else 1.0
+
+        def _transform_coord_x(v: int) -> int:
+            return int(round(g_off_x + (v - g_ch_off_x) * sx))
+
+        def _transform_coord_y(v: int) -> int:
+            return int(round(g_off_y + (v - g_ch_off_y) * sy))
+
+        def _transform_size_x(v: int) -> int:
+            return int(round(v * sx))
+
+        def _transform_size_y(v: int) -> int:
+            return int(round(v * sy))
+
+        child_elements: List[Any] = []
+        for child in list(group_el):
+            local = _xml_local_name(child.tag)
+            if local in {"nvGrpSpPr", "grpSpPr"}:
+                continue
+            child_elements.append(child)
+        if not child_elements:
+            raise ValueError("群組內沒有可解群組的子 shape")
+
+        moved_items: List[Dict[str, Any]] = []
+        notes: List[str] = []
+        for child in child_elements:
+            xfrm = _find_xfrm(child)
+            if xfrm is not None:
+                off_node = xfrm.find(qn("a:off"))
+                ext_node = xfrm.find(qn("a:ext"))
+                if off_node is not None:
+                    off_node.set("x", str(_transform_coord_x(_safe_int(off_node, "x", 0))))
+                    off_node.set("y", str(_transform_coord_y(_safe_int(off_node, "y", 0))))
+                if ext_node is not None:
+                    ext_node.set("cx", str(max(0, _transform_size_x(_safe_int(ext_node, "cx", 0)))))
+                    ext_node.set("cy", str(max(0, _transform_size_y(_safe_int(ext_node, "cy", 0)))))
+
+                ch_off_node = xfrm.find(qn("a:chOff"))
+                ch_ext_node = xfrm.find(qn("a:chExt"))
+                if ch_off_node is not None:
+                    ch_off_node.set("x", str(_transform_coord_x(_safe_int(ch_off_node, "x", 0))))
+                    ch_off_node.set("y", str(_transform_coord_y(_safe_int(ch_off_node, "y", 0))))
+                if ch_ext_node is not None:
+                    ch_ext_node.set("cx", str(max(0, _transform_size_x(_safe_int(ch_ext_node, "cx", 0)))))
+                    ch_ext_node.set("cy", str(max(0, _transform_size_y(_safe_int(ch_ext_node, "cy", 0)))))
+            else:
+                notes.append(f"子 shape({ _xml_local_name(child.tag) }) 缺少 xfrm，位置可能未調整。")
+
+            moved_items.append(
+                {
+                    "shape_type": _xml_local_name(child.tag),
+                    **_extract_cnvpr_meta(child),
+                }
+            )
+
+        children_snapshot = list(sp_tree)
+        try:
+            group_xml_index = children_snapshot.index(group_el)
+        except ValueError:
+            raise ValueError("找不到群組 XML 節點，無法解群組")
+
+        sp_tree.remove(group_el)
+        for offset, child in enumerate(child_elements):
+            sp_tree.insert(group_xml_index + offset, child)
+
+        for item in moved_items:
+            sid = item.get("shape_id")
+            if sid is None:
+                continue
+            item["shape_index"] = None
+            for idx, candidate in enumerate(slide.shapes):
+                if getattr(candidate, "shape_id", None) == sid:
+                    item["shape_index"] = idx
+                    break
+
+        return {
+            "slide_index": slide_index,
+            "ungrouped_from_shape_id": getattr(shape, "shape_id", None),
+            "ungrouped_from_shape_index": resolved_shape_index,
+            "ungrouped_count": len(moved_items),
+            "items": moved_items,
+            "notes": notes,
+        }
+
+    def ungroup_shapes_batch(
+            self,
+            items: List[Dict[str, Any]],
+            default_slide_index: Optional[int] = None,
+        ) -> Dict[str, Any]:
+        if not items:
+            raise ValueError("items 不可為空")
+
+        results: List[Dict[str, Any]] = []
+        for idx, spec in enumerate(items):
+            if not isinstance(spec, dict):
+                raise ValueError(f"items[{idx}] 必須是 object")
+            slide_value = spec.get("slide_index", default_slide_index)
+            if slide_value is None:
+                raise ValueError(f"items[{idx}] 缺少 slide_index，且未提供 default_slide_index")
+            sid = spec.get("shape_id")
+            sidx = spec.get("shape_index")
+            if sid is None and sidx is None:
+                raise ValueError(f"items[{idx}] 需至少提供 shape_id 或 shape_index")
+
+            result = self.ungroup_shape(
+                slide_index=int(slide_value),
+                shape_id=int(sid) if sid is not None else None,
+                shape_index=int(sidx) if sidx is not None else None,
+            )
+            result["item_index"] = idx
+            results.append(result)
+
+        return {
+            "requested_count": len(items),
+            "ungrouped_count": len(results),
+            "items": results,
         }
 
     def get_shape_style(self, slide_index: int, shape_id: Optional[int] = None, shape_index: Optional[int] = None) -> Dict[str, Any]:
@@ -2543,6 +3432,13 @@ def add_text(
         font_name: Optional[str] = None,
         font_color: Optional[Tuple[int, int, int]] = None,
         align: str = "left",
+        fill_color: Optional[Tuple[int, int, int]] = None,
+        fill_transparency: Optional[float] = None,
+        line_style: Optional[str] = None,
+        line_color: Optional[Tuple[int, int, int]] = None,
+        line_width: Optional[int] = None,
+        word_wrap: Optional[bool] = None,
+        auto_fit: Optional[str] = None,
     ) -> Dict[str, Any]:
     return document.add_textbox(
         slide_index=slide_index,
@@ -2557,6 +3453,13 @@ def add_text(
         font_name=font_name,
         font_color=font_color,
         align=align,
+        fill_color=fill_color,
+        fill_transparency=fill_transparency,
+        line_style=line_style,
+        line_color=line_color,
+        line_width=line_width,
+        word_wrap=word_wrap,
+        auto_fit=auto_fit,
     )
 
 
@@ -2582,6 +3485,8 @@ def add_wordart_like_textbox(
         font_name: Optional[str] = None,
         font_color: Optional[Tuple[int, int, int]] = None,
         align: str = "center",
+        word_wrap: Optional[bool] = None,
+        auto_fit: Optional[str] = None,
     ) -> Dict[str, Any]:
     """
     以一般文字框模擬 WordArt 風格（大字、描邊／底色等由後續參數擴充）。
@@ -2605,6 +3510,8 @@ def add_wordart_like_textbox(
         font_name=font_name,
         font_color=font_color,
         align=align,
+        word_wrap=word_wrap,
+        auto_fit=auto_fit,
     )
     result["notes"] = ["以 TextBox 模擬 WordArt；複雜特效請改用範本複製或 OOXML。"]
     return result
@@ -2783,6 +3690,111 @@ def delete_shape(
         "deleted_text_preview": deleted_text_preview,
         "remaining_shape_count": len(document.prs.slides[slide_index].shapes),
     }
+
+
+def delete_shapes(
+        document: PPTDocument,
+        slide_index: int,
+        shape_ids: Optional[List[int]] = None,
+        shape_indices: Optional[List[int]] = None,
+        targets: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+    return document.delete_shapes(
+        slide_index=slide_index,
+        shape_ids=shape_ids,
+        shape_indices=shape_indices,
+        targets=targets,
+    )
+
+
+def clone_shape_to_slide(
+        document: PPTDocument,
+        source_slide_index: int,
+        target_slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        left: Optional[int] = None,
+        top: Optional[int] = None,
+        delta_x: Optional[int] = None,
+        delta_y: Optional[int] = None,
+        new_text: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    return document.clone_shape_to_slide(
+        source_slide_index=source_slide_index,
+        target_slide_index=target_slide_index,
+        shape_id=shape_id,
+        shape_index=shape_index,
+        left=left,
+        top=top,
+        delta_x=delta_x,
+        delta_y=delta_y,
+        new_text=new_text,
+    )
+
+
+def clone_shapes_to_slide(
+        document: PPTDocument,
+        clones: List[Dict[str, Any]],
+        default_source_slide_index: Optional[int] = None,
+        default_target_slide_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    return document.clone_shapes_to_slide(
+        clones=clones,
+        default_source_slide_index=default_source_slide_index,
+        default_target_slide_index=default_target_slide_index,
+    )
+
+
+def group_shapes(
+        document: PPTDocument,
+        slide_index: int,
+        shape_ids: Optional[List[int]] = None,
+        shape_indices: Optional[List[int]] = None,
+        targets: Optional[List[Dict[str, Any]]] = None,
+        group_name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    return document.group_shapes(
+        slide_index=slide_index,
+        shape_ids=shape_ids,
+        shape_indices=shape_indices,
+        targets=targets,
+        group_name=group_name,
+    )
+
+
+def group_shapes_batch(
+        document: PPTDocument,
+        groups: List[Dict[str, Any]],
+        default_slide_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    return document.group_shapes_batch(
+        groups=groups,
+        default_slide_index=default_slide_index,
+    )
+
+
+def ungroup_shape(
+        document: PPTDocument,
+        slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    return document.ungroup_shape(
+        slide_index=slide_index,
+        shape_id=shape_id,
+        shape_index=shape_index,
+    )
+
+
+def ungroup_shapes_batch(
+        document: PPTDocument,
+        items: List[Dict[str, Any]],
+        default_slide_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
+    return document.ungroup_shapes_batch(
+        items=items,
+        default_slide_index=default_slide_index,
+    )
 
 
 def clone_named_shape_from_template(
@@ -3993,6 +5005,11 @@ def add_image(
         width: Optional[int] = None,
         height: Optional[int] = None,
         keep_aspect_ratio: bool = True,
+        rotation: Optional[float] = None,
+        crop_left: Optional[float] = None,
+        crop_right: Optional[float] = None,
+        crop_top: Optional[float] = None,
+        crop_bottom: Optional[float] = None,
     ) -> Dict[str, Any]:
     return document.add_image(
         slide_index=slide_index,
@@ -4002,6 +5019,11 @@ def add_image(
         width=width,
         height=height,
         keep_aspect_ratio=keep_aspect_ratio,
+        rotation=rotation,
+        crop_left=crop_left,
+        crop_right=crop_right,
+        crop_top=crop_top,
+        crop_bottom=crop_bottom,
     )
 
 
@@ -4464,6 +5486,17 @@ def add_shape(
     )
 
 
+def add_shapes(
+        document: PPTDocument,
+        slide_index: int,
+        shapes: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+    return document.add_shapes(
+        slide_index=slide_index,
+        shapes=shapes,
+    )
+
+
 def add_line(
         document: PPTDocument,
         slide_index: int,
@@ -4565,6 +5598,43 @@ def set_textbox_style(
         line_style=line_style,
         line_color=line_color,
         line_width=line_width,
+    )
+
+
+def set_textbox_text_style(
+        document: PPTDocument,
+        slide_index: int,
+        shape_id: Optional[int] = None,
+        shape_index: Optional[int] = None,
+        font_size: Optional[int] = None,
+        font_name: Optional[str] = None,
+        font_color: Optional[Tuple[int, int, int]] = None,
+        bold: Optional[bool] = None,
+        italic: Optional[bool] = None,
+        align: Optional[str] = None,
+        line_spacing: Optional[float] = None,
+        space_before_pt: Optional[float] = None,
+        space_after_pt: Optional[float] = None,
+        paragraph_index: Optional[int] = None,
+        word_wrap: Optional[bool] = None,
+        auto_fit: Optional[str] = None,
+    ) -> Dict[str, Any]:
+    return document.set_textbox_text_style(
+        slide_index=slide_index,
+        shape_id=shape_id,
+        shape_index=shape_index,
+        font_size=font_size,
+        font_name=font_name,
+        font_color=font_color,
+        bold=bold,
+        italic=italic,
+        align=align,
+        line_spacing=line_spacing,
+        space_before_pt=space_before_pt,
+        space_after_pt=space_after_pt,
+        paragraph_index=paragraph_index,
+        word_wrap=word_wrap,
+        auto_fit=auto_fit,
     )
 
 

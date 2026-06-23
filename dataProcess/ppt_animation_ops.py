@@ -900,3 +900,62 @@ def clear_slide_transition(document: Any, slide_index: int) -> Dict[str, Any]:
         "removed": removed,
         "notes": [],
     }
+
+def list_supported_animation_presets() -> Dict[str, Any]:
+    """
+    列出目前系統支援的物件動畫 preset 與 trigger。
+    這不是掃描本機 PowerPoint，而是回傳本模組目前已實作的能力。
+    """
+    animation_effects = sorted(_EFFECT_TO_PRESET.keys())
+    triggers = sorted(_TRIGGER_TO_NODETYPE.keys())
+
+    effect_details = []
+    for name in animation_effects:
+        preset = _EFFECT_TO_PRESET.get(name, {})
+        effect_details.append(
+            {
+                "effect_type": name,
+                "preset_class": preset.get("preset_class"),
+                "preset_id": preset.get("preset_id"),
+                "transition": preset.get("transition"),
+                "filter": preset.get("filter"),
+            }
+        )
+
+    return {
+        "source": "ppt_animation_ops_builtin",
+        "animation_effect_count": len(animation_effects),
+        "trigger_count": len(triggers),
+        "animation_effects": animation_effects,
+        "triggers": triggers,
+        "effect_details": effect_details,
+        "notes": [
+            "這是目前模組內建支援的動畫 preset，不是掃描本機 PowerPoint/LibreOffice 的結果。"
+        ],
+    }
+
+
+def list_supported_transition_presets() -> Dict[str, Any]:
+    """
+    列出目前系統支援的投影片切換動畫 preset。
+    """
+    transition_types = sorted(_TRANSITION_TO_TAG.keys())
+
+    transition_details = []
+    for name in transition_types:
+        transition_details.append(
+            {
+                "transition_type": name,
+                "xml_tag": _TRANSITION_TO_TAG.get(name),
+            }
+        )
+
+    return {
+        "source": "ppt_animation_ops_builtin",
+        "transition_count": len(transition_types),
+        "transition_types": transition_types,
+        "transition_details": transition_details,
+        "notes": [
+            "這是目前模組內建支援的切換動畫，不是掃描本機 PowerPoint/LibreOffice 的結果。"
+        ],
+    }

@@ -15,6 +15,7 @@ import os
 import json
 import logging
 import traceback
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException
@@ -25,6 +26,10 @@ try:
     from dataProcess.file_importers import FileImportManager
 except Exception:
     FileImportManager = None
+
+from dataProcess.build import build_ppt_from_json
+from dataProcess.check_overlap import analyze_layout
+from dataProcess.parse import merge_api_data, parse_layout_from_pptx
 
 from dataProcess.ppt_stdio import (
     new,
@@ -58,11 +63,13 @@ from dataProcess.ppt_stdio import (
     add_line,
     add_arrow,
     add_shape,
+    add_shapes,
     get_info,
     list_slides,
     get_textbox_style,
     get_slide_textbox_styles,
     set_textbox_style,
+    set_textbox_text_style,
     drag_shape,
     reorder_shape_layer,
     drag_textbox,
@@ -79,6 +86,13 @@ from dataProcess.ppt_stdio import (
     set_slide_transition,
     clear_slide_transition,
     delete_shape,
+    delete_shapes,
+    clone_shape_to_slide,
+    clone_shapes_to_slide,
+    group_shapes,
+    group_shapes_batch,
+    ungroup_shape,
+    ungroup_shapes_batch,
     clone_named_shape_from_template,
     get_slide_text_fonts,
     scan_presentation_text_fonts,
@@ -170,6 +184,13 @@ class AddTextRequest(BaseModel):
     font_name: Optional[str] = None
     font_color: Optional[List[int]] = None
     align: str = "left"
+    fill_color: Optional[List[int]] = Field(None, min_length=3, max_length=3)
+    fill_transparency: Optional[float] = Field(None, ge=0.0, le=1.0)
+    line_style: Optional[str] = None
+    line_color: Optional[List[int]] = Field(None, min_length=3, max_length=3)
+    line_width: Optional[int] = Field(None, ge=0)
+    word_wrap: Optional[bool] = None
+    auto_fit: Optional[str] = None
     save_as: Optional[str] = None
 
 
@@ -186,6 +207,8 @@ class AddWordartLikeTextboxRequest(BaseModel):
     font_name: Optional[str] = None
     font_color: Optional[List[int]] = None
     align: str = "center"
+    word_wrap: Optional[bool] = None
+    auto_fit: Optional[str] = None
     save_as: Optional[str] = None
 
 
@@ -397,6 +420,69 @@ class DeleteShapeRequest(BaseModel):
     save_as: Optional[str] = None
 
 
+class DeleteShapesRequest(BaseModel):
+    file_path: str
+    slide_index: int = Field(..., ge=0)
+    shape_ids: Optional[List[int]] = None
+    shape_indices: Optional[List[int]] = None
+    targets: Optional[List[Dict[str, Any]]] = None
+    save_as: Optional[str] = None
+
+
+class CloneShapeToSlideRequest(BaseModel):
+    file_path: str
+    source_slide_index: int = Field(..., ge=0)
+    target_slide_index: int = Field(..., ge=0)
+    shape_id: Optional[int] = None
+    shape_index: Optional[int] = Field(None, ge=0)
+    left: Optional[int] = Field(None, ge=0)
+    top: Optional[int] = Field(None, ge=0)
+    delta_x: Optional[int] = None
+    delta_y: Optional[int] = None
+    new_text: Optional[str] = None
+    save_as: Optional[str] = None
+
+
+class CloneShapesToSlideRequest(BaseModel):
+    file_path: str
+    clones: List[Dict[str, Any]]
+    default_source_slide_index: Optional[int] = Field(None, ge=0)
+    default_target_slide_index: Optional[int] = Field(None, ge=0)
+    save_as: Optional[str] = None
+
+
+class GroupShapesRequest(BaseModel):
+    file_path: str
+    slide_index: int = Field(..., ge=0)
+    shape_ids: Optional[List[int]] = None
+    shape_indices: Optional[List[int]] = None
+    targets: Optional[List[Dict[str, Any]]] = None
+    group_name: Optional[str] = None
+    save_as: Optional[str] = None
+
+
+class GroupShapesBatchRequest(BaseModel):
+    file_path: str
+    groups: List[Dict[str, Any]]
+    default_slide_index: Optional[int] = Field(None, ge=0)
+    save_as: Optional[str] = None
+
+
+class UngroupShapeRequest(BaseModel):
+    file_path: str
+    slide_index: int = Field(..., ge=0)
+    shape_id: Optional[int] = None
+    shape_index: Optional[int] = Field(None, ge=0)
+    save_as: Optional[str] = None
+
+
+class UngroupShapesBatchRequest(BaseModel):
+    file_path: str
+    items: List[Dict[str, Any]]
+    default_slide_index: Optional[int] = Field(None, ge=0)
+    save_as: Optional[str] = None
+
+
 class CloneNamedShapeFromTemplateRequest(BaseModel):
     file_path: str
     slide_index: int = Field(..., ge=0)
@@ -522,6 +608,13 @@ class AddShapeRequest(BaseModel):
     save_as: Optional[str] = None
 
 
+class AddShapesRequest(BaseModel):
+    file_path: str
+    slide_index: int = Field(..., ge=0)
+    shapes: List[Dict[str, Any]]
+    save_as: Optional[str] = None
+
+
 class AddLineRequest(BaseModel):
     file_path: str
     slide_index: int = Field(..., ge=0)
@@ -614,6 +707,26 @@ class SetTextboxStyleRequest(BaseModel):
     line_style: Optional[str] = None
     line_color: Optional[List[int]] = Field(None, min_length=3, max_length=3)
     line_width: Optional[int] = Field(None, ge=0)
+    save_as: Optional[str] = None
+
+
+class SetTextboxTextStyleRequest(BaseModel):
+    file_path: str
+    slide_index: int = Field(..., ge=0)
+    shape_id: Optional[int] = None
+    shape_index: Optional[int] = Field(None, ge=0)
+    font_size: Optional[int] = Field(None, gt=0)
+    font_name: Optional[str] = None
+    font_color: Optional[List[int]] = Field(None, min_length=3, max_length=3)
+    bold: Optional[bool] = None
+    italic: Optional[bool] = None
+    align: Optional[str] = None
+    line_spacing: Optional[float] = Field(None, gt=0)
+    space_before_pt: Optional[float] = Field(None, ge=0)
+    space_after_pt: Optional[float] = Field(None, ge=0)
+    paragraph_index: Optional[int] = Field(None, ge=0)
+    word_wrap: Optional[bool] = None
+    auto_fit: Optional[str] = None
     save_as: Optional[str] = None
 
 
@@ -780,6 +893,25 @@ class RunParserPipelineRequest(BaseModel):
     chunk_options: Optional[Dict[str, Any]] = None
 
 
+class ParseStructureRequest(BaseModel):
+    file_path: str
+    output_path: Optional[str] = None
+    export_media_dir: Optional[str] = None
+    no_api: bool = False
+
+
+class BuildStructureRequest(BaseModel):
+    json_path: str
+    output_path: Optional[str] = None
+    dpi: int = Field(96, gt=0)
+
+
+class CheckOverlapRequest(BaseModel):
+    json_path: str
+    output_path: Optional[str] = None
+    only_overlaps: bool = False
+
+
 def _tuple3_opt(v: Optional[List[int]]) -> Optional[tuple]:
     if v is None:
         return None
@@ -822,6 +954,12 @@ def _get_file_import_manager() -> Any:
     if _file_import_manager is None:
         raise RuntimeError("file_importers is not available in this environment")
     return _file_import_manager
+
+
+def _resolve_output_path(source_path: Path, explicit_output: Optional[str], default_name: str) -> Path:
+    if explicit_output:
+        return Path(explicit_output).expanduser().resolve()
+    return source_path.with_name(default_name)
 
 
 # -------------------------
@@ -957,6 +1095,94 @@ def ppt_run_parser_pipeline(req: RunParserPipelineRequest):
         _err_to_http(e)
 
 
+@app.post("/ppt/parse_structure")
+def ppt_parse_structure(req: ParseStructureRequest):
+    try:
+        ppt_path = Path(req.file_path).expanduser().resolve()
+        if not ppt_path.exists():
+            raise FileNotFoundError(f"File not found: {ppt_path}")
+        if ppt_path.suffix.lower() != ".pptx":
+            raise ValueError(f"Only .pptx is supported: {ppt_path}")
+
+        output_path = _resolve_output_path(ppt_path, req.output_path, f"{ppt_path.stem}.json")
+        export_media_dir = (
+            Path(req.export_media_dir).expanduser().resolve()
+            if req.export_media_dir
+            else output_path.with_name(f"{output_path.stem}_assets")
+        )
+
+        layout = parse_layout_from_pptx(ppt_path, export_media_dir=export_media_dir)
+        if not req.no_api:
+            layout = merge_api_data(layout, ppt_path)
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(layout, ensure_ascii=False, indent=2), encoding="utf-8")
+        return _ok(
+            {
+                "source_pptx_path": str(ppt_path),
+                "output_json_path": str(output_path),
+                "export_media_dir": str(export_media_dir),
+                "slide_count": layout.get("slide_count"),
+                "slide_size": layout.get("slide_size"),
+            },
+            message="parse_structure completed",
+        )
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/build_from_structure")
+def ppt_build_from_structure(req: BuildStructureRequest):
+    try:
+        json_path = Path(req.json_path).expanduser().resolve()
+        if not json_path.exists():
+            raise FileNotFoundError(f"JSON file not found: {json_path}")
+
+        layout = json.loads(json_path.read_text(encoding="utf-8-sig"))
+        output_path = _resolve_output_path(json_path, req.output_path, f"{json_path.stem}_rebuild.pptx")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        result = build_ppt_from_json(layout, output_path, dpi=req.dpi)
+        return _ok(
+            {
+                "source_json_path": str(json_path),
+                "output_pptx_path": str(output_path),
+                "result": result,
+            },
+            message="build_from_structure completed",
+        )
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/check_overlap")
+def ppt_check_overlap(req: CheckOverlapRequest):
+    try:
+        json_path = Path(req.json_path).expanduser().resolve()
+        if not json_path.exists():
+            raise FileNotFoundError(f"JSON file not found: {json_path}")
+
+        layout = json.loads(json_path.read_text(encoding="utf-8-sig"))
+        report = analyze_layout(layout)
+        if req.only_overlaps:
+            report["slides"] = [slide for slide in report.get("slides", []) if slide.get("overlap_count", 0) > 0]
+
+        output_path = _resolve_output_path(json_path, req.output_path, f"{json_path.stem}_overlap_report.json")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        return _ok(
+            {
+                "source_json_path": str(json_path),
+                "output_report_path": str(output_path),
+                "slide_count": report.get("slide_count"),
+                "slides_with_overlaps": report.get("slides_with_overlaps"),
+                "total_overlap_count": report.get("total_overlap_count"),
+            },
+            message="check_overlap completed",
+        )
+    except Exception as e:
+        _err_to_http(e)
+
+
 # -------------------------
 # PPT Create / Load Info
 # -------------------------
@@ -1038,6 +1264,38 @@ def ppt_set_textbox_style(req: SetTextboxStyleRequest):
             "result": result,
             "info": get_info(doc),
         }, message="更新文字框樣式成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/set_textbox_text_style")
+def ppt_set_textbox_text_style(req: SetTextboxTextStyleRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = set_textbox_text_style(
+            document=doc,
+            slide_index=req.slide_index,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+            font_size=req.font_size,
+            font_name=req.font_name,
+            font_color=tuple(req.font_color) if req.font_color is not None else None,
+            bold=req.bold,
+            italic=req.italic,
+            align=req.align,
+            line_spacing=req.line_spacing,
+            space_before_pt=req.space_before_pt,
+            space_after_pt=req.space_after_pt,
+            paragraph_index=req.paragraph_index,
+            word_wrap=req.word_wrap,
+            auto_fit=req.auto_fit,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="更新文字框文字樣式成功")
     except Exception as e:
         _err_to_http(e)
 
@@ -1151,6 +1409,153 @@ def ppt_delete_shape(req: DeleteShapeRequest):
             "result": result,
             "info": get_info(doc),
         }, message="刪除 shape 成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/delete_shapes")
+def ppt_delete_shapes(req: DeleteShapesRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = delete_shapes(
+            document=doc,
+            slide_index=req.slide_index,
+            shape_ids=req.shape_ids,
+            shape_indices=req.shape_indices,
+            targets=req.targets,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="批次刪除 shape 成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/clone_shape_to_slide")
+def ppt_clone_shape_to_slide(req: CloneShapeToSlideRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = clone_shape_to_slide(
+            document=doc,
+            source_slide_index=req.source_slide_index,
+            target_slide_index=req.target_slide_index,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+            left=req.left,
+            top=req.top,
+            delta_x=req.delta_x,
+            delta_y=req.delta_y,
+            new_text=req.new_text,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="複製 shape 到目標頁成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/clone_shapes_to_slide")
+def ppt_clone_shapes_to_slide(req: CloneShapesToSlideRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = clone_shapes_to_slide(
+            document=doc,
+            clones=req.clones,
+            default_source_slide_index=req.default_source_slide_index,
+            default_target_slide_index=req.default_target_slide_index,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="批次複製 shape 成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/group_shapes")
+def ppt_group_shapes(req: GroupShapesRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = group_shapes(
+            document=doc,
+            slide_index=req.slide_index,
+            shape_ids=req.shape_ids,
+            shape_indices=req.shape_indices,
+            targets=req.targets,
+            group_name=req.group_name,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="shape 群組化成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/group_shapes_batch")
+def ppt_group_shapes_batch(req: GroupShapesBatchRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = group_shapes_batch(
+            document=doc,
+            groups=req.groups,
+            default_slide_index=req.default_slide_index,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="批次群組 shape 成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/ungroup_shape")
+def ppt_ungroup_shape(req: UngroupShapeRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = ungroup_shape(
+            document=doc,
+            slide_index=req.slide_index,
+            shape_id=req.shape_id,
+            shape_index=req.shape_index,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="shape 解群組成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/ungroup_shapes_batch")
+def ppt_ungroup_shapes_batch(req: UngroupShapesBatchRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = ungroup_shapes_batch(
+            document=doc,
+            items=req.items,
+            default_slide_index=req.default_slide_index,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="批次解群組 shape 成功")
     except Exception as e:
         _err_to_http(e)
 
@@ -1490,6 +1895,16 @@ def ppt_add_text(req: AddTextRequest):
             if len(req.font_color) != 3:
                 raise ValueError("font_color 必須是 [R, G, B]")
             font_color = (req.font_color[0], req.font_color[1], req.font_color[2])
+        fill_color = None
+        if req.fill_color is not None:
+            if len(req.fill_color) != 3:
+                raise ValueError("fill_color 必須是 [R, G, B]")
+            fill_color = (req.fill_color[0], req.fill_color[1], req.fill_color[2])
+        line_color = None
+        if req.line_color is not None:
+            if len(req.line_color) != 3:
+                raise ValueError("line_color 必須是 [R, G, B]")
+            line_color = (req.line_color[0], req.line_color[1], req.line_color[2])
 
         result = add_text(
             document=doc,
@@ -1505,6 +1920,13 @@ def ppt_add_text(req: AddTextRequest):
             font_name=req.font_name,
             font_color=font_color,
             align=req.align,
+            fill_color=fill_color,
+            fill_transparency=req.fill_transparency,
+            line_style=req.line_style,
+            line_color=line_color,
+            line_width=req.line_width,
+            word_wrap=req.word_wrap,
+            auto_fit=req.auto_fit,
         )
         out_path = save(doc, req.save_as or req.file_path)
 
@@ -1541,6 +1963,8 @@ def ppt_add_wordart_like_textbox(req: AddWordartLikeTextboxRequest):
             font_name=req.font_name,
             font_color=font_color,
             align=req.align,
+            word_wrap=req.word_wrap,
+            auto_fit=req.auto_fit,
         )
         out_path = save(doc, req.save_as or req.file_path)
 
@@ -2027,6 +2451,25 @@ def ppt_add_shape(req: AddShapeRequest):
             "result": result,
             "info": get_info(doc),
         }, message="新增圖形成功")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/add_shapes")
+def ppt_add_shapes(req: AddShapesRequest):
+    try:
+        doc = open_presentation(req.file_path)
+        result = add_shapes(
+            document=doc,
+            slide_index=req.slide_index,
+            shapes=req.shapes,
+        )
+        out_path = save(doc, req.save_as or req.file_path)
+        return _ok({
+            "file_path": out_path,
+            "result": result,
+            "info": get_info(doc),
+        }, message="批次新增圖形成功")
     except Exception as e:
         _err_to_http(e)
 

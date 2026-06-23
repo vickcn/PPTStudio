@@ -792,7 +792,10 @@ def delete_table(
         shape_index: Optional[int] = None,
     ) -> Dict[str, Any]:
     """刪除整個表格 shape。"""
-    from dataProcess.ppt_stdio import delete_shape
+    if __package__ in {None, ""}:
+        from ppt_stdio import delete_shape
+    else:
+        from .ppt_stdio import delete_shape
 
     shape, table, resolved_index = _get_table_shape(document, slide_index, shape_id, shape_index)
     sid = getattr(shape, "shape_id", None)
