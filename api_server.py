@@ -15,6 +15,7 @@ import os
 import json
 import logging
 import traceback
+import importlib
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -27,7 +28,28 @@ try:
 except Exception:
     FileImportManager = None
 
-from dataProcess.build import build_ppt_from_json
+import dataProcess.build as build_module
+from dataProcess.layout_engine import (
+    issues_to_dicts,
+    load_layout_manifest,
+    manifest_path_for_image,
+    order_shapes_for_build,
+    plan_overlay_from_paths,
+    plan_overlay_geometry,
+    plan_text_block,
+    plan_header_band,
+    plan_stacked_text_blocks,
+    fit_font_size,
+    split_vertical_equal,
+    split_horizontal_weights,
+    slide_canvas_from_size,
+    placement_to_dict,
+    placements_to_dicts,
+    canvas_to_dict,
+    TextBlockSpec,
+    geometry_dict_from_rect_in,
+    validate_slide_layout,
+)
 from dataProcess.check_overlap import analyze_layout
 from dataProcess.parse import merge_api_data, parse_layout_from_pptx
 
@@ -186,6 +208,7 @@ class AddTextRequest(BaseModel):
     align: str = "left"
     fill_color: Optional[List[int]] = Field(None, min_length=3, max_length=3)
     fill_transparency: Optional[float] = Field(None, ge=0.0, le=1.0)
+    fill_none: bool = False
     line_style: Optional[str] = None
     line_color: Optional[List[int]] = Field(None, min_length=3, max_length=3)
     line_width: Optional[int] = Field(None, ge=0)
@@ -599,6 +622,7 @@ class AddShapeRequest(BaseModel):
     height: int = Field(..., gt=0)
     text: str = ""
     fill_color: Optional[List[int]] = None
+    fill_none: bool = False
     line_color: Optional[List[int]] = None
     line_width: Optional[int] = Field(None, gt=0)
     font_size: int = Field(18, gt=0)
@@ -912,6 +936,72 @@ class CheckOverlapRequest(BaseModel):
     only_overlaps: bool = False
 
 
+class PlanOverlayRequest(BaseModel):
+    picture_geometry: Dict[str, Any]
+    anchor_id: str
+    pad_px: float = 0
+    image_path: Optional[str] = None
+    manifest_path: Optional[str] = None
+
+
+class ValidateSlideLayoutRequest(BaseModel):
+    slide: Dict[str, Any]
+    slide_size: Optional[Dict[str, Any]] = None
+
+
+class OrderShapesRequest(BaseModel):
+    shapes: List[Dict[str, Any]]
+
+
+class PlanTextBlockRequest(BaseModel):
+    text: str
+    box: Dict[str, Any]
+    role: str = "body"
+    single_line: bool = False
+    bold: bool = False
+    max_lines: Optional[int] = None
+    min_font_pt: float = 9.0
+    max_font_pt: float = 44.0
+    font_size_pt: Optional[float] = None
+    leading: float = 1.28
+    inner_pad_in: float = 0.08
+
+
+class FitFontSizeRequest(BaseModel):
+    text: str
+    width_in: float
+    height_in: float
+    min_font_pt: float = 9.0
+    max_font_pt: float = 44.0
+    bold: bool = False
+    leading: float = 1.28
+    single_line: bool = False
+    inner_pad_in: float = 0.08
+
+
+class SplitRegionRequest(BaseModel):
+    region: Dict[str, Any]
+    mode: str = "vertical_equal"
+    count: int = 1
+    weights: Optional[List[float]] = None
+    gap_in: float = 0.0
+
+
+class SlideCanvasRequest(BaseModel):
+    slide_size: Optional[Dict[str, Any]] = None
+    margin_left_in: float = 0.5
+    margin_top_in: float = 0.35
+    margin_right_in: float = 0.5
+    margin_bottom_in: float = 0.3
+
+
+class PlanStackedTextRequest(BaseModel):
+    blocks: List[PlanTextBlockRequest]
+    region: Dict[str, Any]
+    gap_in: float = 0.08
+    weights: Optional[List[float]] = None
+
+
 def _tuple3_opt(v: Optional[List[int]]) -> Optional[tuple]:
     if v is None:
         return None
@@ -1141,7 +1231,8 @@ def ppt_build_from_structure(req: BuildStructureRequest):
         layout = json.loads(json_path.read_text(encoding="utf-8-sig"))
         output_path = _resolve_output_path(json_path, req.output_path, f"{json_path.stem}_rebuild.pptx")
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        result = build_ppt_from_json(layout, output_path, dpi=req.dpi)
+        importlib.reload(build_module)
+        result = build_module.build_ppt_from_json(layout, output_path, dpi=req.dpi)
         return _ok(
             {
                 "source_json_path": str(json_path),
@@ -1149,6 +1240,192 @@ def ppt_build_from_structure(req: BuildStructureRequest):
                 "result": result,
             },
             message="build_from_structure completed",
+        )
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/layout/plan_overlay")
+def ppt_layout_plan_overlay(req: PlanOverlayRequest):
+    try:
+        if req.manifest_path:
+            manifest = load_layout_manifest(req.manifest_path)
+            geometry = plan_overlay_geometry(
+                req.picture_geometry,
+                manifest,
+                req.anchor_id,
+                pad_px=req.pad_px,
+            )
+            manifest_used = str(Path(req.manifest_path).resolve())
+        elif req.image_path:
+            geometry = plan_overlay_from_paths(
+                req.picture_geometry,
+                req.image_path,
+                req.anchor_id,
+                pad_px=req.pad_px,
+            )
+            manifest_used = str(manifest_path_for_image(req.image_path).resolve())
+        else:
+            raise ValueError("請提供 image_path 或 manifest_path")
+
+        return _ok(
+            {
+                "geometry": geometry,
+                "anchor_id": req.anchor_id,
+                "manifest_path": manifest_used,
+            },
+            message="plan_overlay completed",
+        )
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/layout/validate_slide")
+def ppt_layout_validate_slide(req: ValidateSlideLayoutRequest):
+    try:
+        issues = validate_slide_layout(req.slide, req.slide_size)
+        return _ok(
+            {
+                "issue_count": len(issues),
+                "issues": issues_to_dicts(issues),
+                "ok": len(issues) == 0,
+            },
+            message="validate_slide completed",
+        )
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/layout/order_shapes")
+def ppt_layout_order_shapes(req: OrderShapesRequest):
+    try:
+        ordered = order_shapes_for_build(req.shapes)
+        return _ok(
+            {"shapes": ordered, "shape_count": len(ordered)},
+            message="order_shapes completed",
+        )
+    except Exception as e:
+        _err_to_http(e)
+
+
+def _region_from_dict(data: Dict[str, Any]):
+    from dataProcess.layout_engine import RectIn, geometry_to_rect_in
+
+    if "left_in" in data:
+        return geometry_to_rect_in(data)
+    return RectIn(
+        left=float(data.get("left") or data.get("left_in") or 0.0),
+        top=float(data.get("top") or data.get("top_in") or 0.0),
+        width=float(data.get("width") or data.get("width_in") or 0.0),
+        height=float(data.get("height") or data.get("height_in") or 0.0),
+    )
+
+
+def _text_block_spec_from_request(req: PlanTextBlockRequest) -> TextBlockSpec:
+    return TextBlockSpec(
+        text=req.text,
+        role=req.role,
+        single_line=req.single_line,
+        bold=req.bold,
+        max_lines=req.max_lines,
+        min_font_pt=req.min_font_pt,
+        max_font_pt=req.max_font_pt,
+        font_size_pt=req.font_size_pt,
+        leading=req.leading,
+        inner_pad_in=req.inner_pad_in,
+    )
+
+
+@app.post("/ppt/layout/plan_text_block")
+def ppt_layout_plan_text_block(req: PlanTextBlockRequest):
+    try:
+        box = _region_from_dict(req.box)
+        placement = plan_text_block(_text_block_spec_from_request(req), box)
+        return _ok(placement_to_dict(placement), message="plan_text_block completed")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/layout/fit_font_size")
+def ppt_layout_fit_font_size(req: FitFontSizeRequest):
+    try:
+        font_pt = fit_font_size(
+            req.text,
+            req.width_in,
+            req.height_in,
+            min_font_pt=req.min_font_pt,
+            max_font_pt=req.max_font_pt,
+            bold=req.bold,
+            leading=req.leading,
+            single_line=req.single_line,
+            inner_pad_in=req.inner_pad_in,
+        )
+        return _ok(
+            {
+                "font_size_pt": font_pt,
+                "text": req.text,
+                "width_in": req.width_in,
+                "height_in": req.height_in,
+            },
+            message="fit_font_size completed",
+        )
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/layout/split_region")
+def ppt_layout_split_region(req: SplitRegionRequest):
+    try:
+        region = _region_from_dict(req.region)
+        mode = str(req.mode or "vertical_equal").lower()
+        if mode == "horizontal_weights":
+            weights = req.weights or [1.0 for _ in range(max(req.count, 1))]
+            rects = split_horizontal_weights(region, weights, gap_in=req.gap_in)
+        else:
+            rects = split_vertical_equal(region, max(req.count, 1), gap_in=req.gap_in)
+        return _ok(
+            {
+                "mode": mode,
+                "rects": [geometry_dict_from_rect_in(item) for item in rects],
+                "rect_count": len(rects),
+            },
+            message="split_region completed",
+        )
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/layout/slide_canvas")
+def ppt_layout_slide_canvas(req: SlideCanvasRequest):
+    try:
+        canvas = slide_canvas_from_size(
+            req.slide_size,
+            margins=(
+                req.margin_left_in,
+                req.margin_top_in,
+                req.margin_right_in,
+                req.margin_bottom_in,
+            ),
+        )
+        return _ok(canvas_to_dict(canvas), message="slide_canvas completed")
+    except Exception as e:
+        _err_to_http(e)
+
+
+@app.post("/ppt/layout/plan_stacked_text")
+def ppt_layout_plan_stacked_text(req: PlanStackedTextRequest):
+    try:
+        region = _region_from_dict(req.region)
+        specs = [_text_block_spec_from_request(block) for block in req.blocks]
+        placements = plan_stacked_text_blocks(
+            specs,
+            region,
+            gap_in=req.gap_in,
+            weights=req.weights,
+        )
+        return _ok(
+            {"placements": placements_to_dicts(placements), "placement_count": len(placements)},
+            message="plan_stacked_text completed",
         )
     except Exception as e:
         _err_to_http(e)
@@ -1922,6 +2199,7 @@ def ppt_add_text(req: AddTextRequest):
             align=req.align,
             fill_color=fill_color,
             fill_transparency=req.fill_transparency,
+            fill_none=req.fill_none,
             line_style=req.line_style,
             line_color=line_color,
             line_width=req.line_width,
@@ -2443,6 +2721,7 @@ def ppt_add_shape(req: AddShapeRequest):
             bold=req.bold,
             font_name=req.font_name,
             font_color=font_color,
+            fill_none=req.fill_none,
         )
         out_path = save(doc, req.save_as or req.file_path)
 

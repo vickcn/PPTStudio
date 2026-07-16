@@ -398,6 +398,28 @@ def _write_fill_transparency_to_xml(shape: Any, fill_transparency: float) -> Non
     color_node.append(alpha)
 
 
+def _apply_shape_fill(
+        shape: Any,
+        *,
+        fill_none: bool = False,
+        fill_color: Optional[Tuple[int, int, int]] = None,
+        fill_transparency: Optional[float] = None,
+    ) -> None:
+    if fill_none:
+        shape.fill.background()
+        return
+    if fill_color is None and fill_transparency is None:
+        return
+    shape.fill.solid()
+    if fill_color is not None:
+        shape.fill.fore_color.rgb = _rgb_tuple_to_color(fill_color)
+    if fill_transparency is not None:
+        try:
+            _write_fill_transparency_to_xml(shape, float(fill_transparency))
+        except Exception:
+            shape.fill.transparency = float(fill_transparency)
+
+
 def _dash_style_to_name(dash_style: Any) -> Optional[str]:
     if dash_style is None:
         return "solid"
@@ -539,6 +561,7 @@ class PPTDocument:
             line_width: Optional[int] = None,
             word_wrap: Optional[bool] = None,
             auto_fit: Optional[str] = None,
+            fill_none: bool = False,
         ) -> Dict[str, Any]:
         _validate_slide_index(self.prs, slide_index)
         if fill_transparency is not None and not (0.0 <= float(fill_transparency) <= 1.0):
@@ -587,15 +610,14 @@ class PPTDocument:
             if color:
                 run.font.color.rgb = color
 
-        if fill_color is not None or fill_transparency is not None:
-            shape.fill.solid()
-            if fill_color is not None:
-                shape.fill.fore_color.rgb = _rgb_tuple_to_color(fill_color)
-            if fill_transparency is not None:
-                try:
-                    _write_fill_transparency_to_xml(shape, float(fill_transparency))
-                except Exception:
-                    shape.fill.transparency = float(fill_transparency)
+        if fill_none:
+            _apply_shape_fill(shape, fill_none=True)
+        elif fill_color is not None or fill_transparency is not None:
+            _apply_shape_fill(
+                shape,
+                fill_color=fill_color,
+                fill_transparency=fill_transparency,
+            )
 
         if line_color is not None:
             shape.line.color.rgb = _rgb_tuple_to_color(line_color)
@@ -763,6 +785,7 @@ class PPTDocument:
             bold: bool = False,
             font_name: Optional[str] = None,
             font_color: Optional[Tuple[int, int, int]] = None,
+            fill_none: bool = False,
         ) -> Dict[str, Any]:
         _validate_slide_index(self.prs, slide_index)
         slide = self.prs.slides[slide_index]
@@ -795,9 +818,11 @@ class PPTDocument:
         )
 
         # fill
-        if fill_color is not None:
-            shape.fill.solid()
-            shape.fill.fore_color.rgb = _rgb_tuple_to_color(fill_color)
+        _apply_shape_fill(
+            shape,
+            fill_none=fill_none,
+            fill_color=fill_color,
+        )
 
         # line
         if line_color is not None:
@@ -872,6 +897,7 @@ class PPTDocument:
                 bold=bool(spec.get("bold", False)),
                 font_name=spec.get("font_name"),
                 font_color=_to_rgb_tuple(spec.get("font_color"), "font_color", idx),
+                fill_none=bool(spec.get("fill_none", False)),
             )
             result["item_index"] = idx
             added_results.append(result)
@@ -3494,6 +3520,7 @@ def add_text(
         line_width: Optional[int] = None,
         word_wrap: Optional[bool] = None,
         auto_fit: Optional[str] = None,
+        fill_none: bool = False,
     ) -> Dict[str, Any]:
     return document.add_textbox(
         slide_index=slide_index,
@@ -3515,6 +3542,7 @@ def add_text(
         line_width=line_width,
         word_wrap=word_wrap,
         auto_fit=auto_fit,
+        fill_none=fill_none,
     )
 
 
@@ -5522,6 +5550,7 @@ def add_shape(
         bold: bool = False,
         font_name: Optional[str] = None,
         font_color: Optional[Tuple[int, int, int]] = None,
+        fill_none: bool = False,
     ) -> Dict[str, Any]:
     return document.add_shape(
         slide_index=slide_index,
@@ -5538,6 +5567,7 @@ def add_shape(
         bold=bold,
         font_name=font_name,
         font_color=font_color,
+        fill_none=fill_none,
     )
 
 

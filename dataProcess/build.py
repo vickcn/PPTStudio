@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any, Optional
 
+from pptx.dml.color import RGBColor
 from pptx.oxml.ns import qn
 from pptx.oxml.xmlchemy import OxmlElement
-from pptx.util import Pt
+from pptx.util import Emu, Pt
 
 
 API_BASE = "http://10.1.3.127:6414"
@@ -33,6 +35,7 @@ if __package__ in {None, ""}:
         set_slide_background_image,
         _apply_text_frame_layout,
     )
+    from layout_engine import order_shapes_for_build
 else:
     from .ppt_stdio import (
         add_image,
@@ -46,6 +49,7 @@ else:
         set_slide_background_image,
         _apply_text_frame_layout,
     )
+    from .layout_engine import order_shapes_for_build
 
 
 def read_json(path: Path) -> dict[str, Any]:
@@ -84,9 +88,86 @@ def pick_first(seq: list[Any], default: Any = None) -> Any:
     return seq[0] if seq else default
 
 
+RUN_STYLE_KEYS = (
+    "font_name",
+    "font_size_pt",
+    "effective_font_size_pt",
+    "bold",
+    "italic",
+    "font_color",
+    "latin_font_name",
+    "east_asian_font_name",
+    "complex_script_font_name",
+)
+
+
+def _paragraphs_joined_text(paragraphs: list[dict[str, Any]]) -> str:
+    return "\n".join(str(paragraph.get("text") or "") for paragraph in paragraphs).replace("\x0b", "\n")
+
+
+def _shape_text_matches_paragraphs(shape: dict[str, Any], paragraphs: list[dict[str, Any]]) -> bool:
+    shape_text = str(shape.get("text") or "").replace("\x0b", "\n").strip()
+    para_text = _paragraphs_joined_text(paragraphs).strip()
+    return shape_text == para_text
+
+
+def _merge_run_style(text_run: dict[str, Any], style_run: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(text_run)
+    for key in RUN_STYLE_KEYS:
+        if style_run.get(key) is not None and merged.get(key) is None:
+            merged[key] = style_run.get(key)
+    return merged
+
+
+def _merge_paragraph_styles(
+    text_paragraphs: list[dict[str, Any]],
+    style_paragraphs: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    merged_paragraphs: list[dict[str, Any]] = []
+    for idx, paragraph in enumerate(text_paragraphs):
+        merged = dict(paragraph)
+        style_para = style_paragraphs[idx] if idx < len(style_paragraphs) else {}
+        text_runs = paragraph.get("runs") or []
+        style_runs = style_para.get("runs") or []
+        if text_runs:
+            merged_runs: list[dict[str, Any]] = []
+            for run_idx, run in enumerate(text_runs):
+                style_run = style_runs[run_idx] if run_idx < len(style_runs) else (style_runs[0] if style_runs else {})
+                merged_runs.append(_merge_run_style(run, style_run))
+            merged["runs"] = merged_runs
+        merged_paragraphs.append(merged)
+    return merged_paragraphs
+
+
+def _paragraphs_from_shape_text(shape: dict[str, Any], style_paragraphs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    shape_text = str(shape.get("text") or "").replace("\x0b", "\n")
+    lines = shape_text.split("\n")
+    shape_paragraphs = shape.get("paragraphs") if isinstance(shape.get("paragraphs"), list) else []
+    result: list[dict[str, Any]] = []
+    for idx, line in enumerate(lines):
+        if idx < len(shape_paragraphs):
+            paragraph = dict(shape_paragraphs[idx])
+            paragraph["text"] = line
+            runs = paragraph.get("runs") or []
+            if runs:
+                paragraph["runs"] = [dict(runs[0])]
+                paragraph["runs"][0]["text"] = line
+            result.append(paragraph)
+            continue
+        if idx < len(style_paragraphs):
+            paragraph = dict(style_paragraphs[idx])
+            paragraph["text"] = line
+            runs = paragraph.get("runs") or [{"text": line}]
+            paragraph["runs"] = [dict(runs[0])]
+            paragraph["runs"][0]["text"] = line
+            result.append(paragraph)
+            continue
+        result.append({"text": line, "runs": [{"text": line}]})
+    return result
+
+
 def first_run_style(shape: dict[str, Any]) -> dict[str, Any]:
-    font_detail = shape.get("font_detail") or {}
-    paragraphs = font_detail.get("paragraphs") or shape.get("paragraphs") or []
+    paragraphs = text_paragraphs(shape)
     for paragraph in paragraphs:
         for run in paragraph.get("runs", []):
             if any(run.get(key) is not None for key in ("font_name", "font_size_pt", "bold", "italic")):
@@ -117,23 +198,62 @@ def infer_text_style(shape: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+LIST_LINE_RE = re.compile(r"^\d+\.\s")
+
+
+def is_list_style_text(shape: dict[str, Any]) -> bool:
+    text = str(shape.get("text") or "").replace("\x0b", "\n")
+    if "\n" in text:
+        return True
+    paragraphs = text_paragraphs(shape)
+    if len(paragraphs) > 1:
+        return True
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if LIST_LINE_RE.match(stripped):
+            return True
+        if stripped[0] in "-•·●○":
+            return True
+    return False
+
+
 def infer_text_frame_layout(shape: dict[str, Any]) -> dict[str, Any]:
     text_frame = shape.get("text_frame")
-    if not isinstance(text_frame, dict):
-        return {}
-
     layout: dict[str, Any] = {}
-    if "word_wrap" in text_frame:
-        layout["word_wrap"] = text_frame.get("word_wrap")
-    if "auto_fit" in text_frame:
-        layout["auto_fit"] = text_frame.get("auto_fit")
+    if isinstance(text_frame, dict):
+        if "word_wrap" in text_frame:
+            layout["word_wrap"] = text_frame.get("word_wrap")
+        if "auto_fit" in text_frame:
+            layout["auto_fit"] = text_frame.get("auto_fit")
+    if is_list_style_text(shape):
+        layout["word_wrap"] = True
     return layout
 
 
 def text_paragraphs(shape: dict[str, Any]) -> list[dict[str, Any]]:
+    shape_text = str(shape.get("text") or "").replace("\x0b", "\n")
+    shape_paragraphs = shape.get("paragraphs") if isinstance(shape.get("paragraphs"), list) else []
     font_detail = shape.get("font_detail") or {}
-    paragraphs = font_detail.get("paragraphs") or shape.get("paragraphs") or []
-    return paragraphs if isinstance(paragraphs, list) else []
+    fd_paragraphs = font_detail.get("paragraphs") if isinstance(font_detail.get("paragraphs"), list) else []
+
+    if shape_paragraphs:
+        if _shape_text_matches_paragraphs(shape, shape_paragraphs):
+            if fd_paragraphs:
+                return _merge_paragraph_styles(shape_paragraphs, fd_paragraphs)
+            return shape_paragraphs
+        if shape_text.strip():
+            return _paragraphs_from_shape_text(shape, fd_paragraphs)
+
+    if fd_paragraphs and shape_text.strip():
+        fd_text = _paragraphs_joined_text(fd_paragraphs).strip()
+        if fd_text != shape_text.strip():
+            return _paragraphs_from_shape_text(shape, fd_paragraphs)
+
+    if fd_paragraphs:
+        return fd_paragraphs
+    return shape_paragraphs
 
 
 def has_run_level_text_style(shape: dict[str, Any]) -> bool:
@@ -144,7 +264,7 @@ def has_run_level_text_style(shape: dict[str, Any]) -> bool:
     if len(paragraphs) > 1 or len(runs) > 1:
         return True
 
-    style_keys = ("font_name", "font_size_pt", "effective_font_size_pt", "bold", "italic")
+    style_keys = ("font_name", "font_size_pt", "effective_font_size_pt", "bold", "italic", "font_color")
     return any(any(run.get(key) is not None for key in style_keys) for run in runs)
 
 
@@ -169,6 +289,14 @@ def apply_run_style(pptx_run: Any, run_spec: dict[str, Any], default_style: dict
     set_run_typeface(pptx_run, "ea", run_spec.get("east_asian_font_name") or font_name)
     set_run_typeface(pptx_run, "cs", run_spec.get("complex_script_font_name") or font_name)
 
+    font_color = run_spec.get("font_color")
+    if isinstance(font_color, list) and len(font_color) == 3:
+        pptx_run.font.color.rgb = RGBColor(
+            to_int(font_color[0], 0),
+            to_int(font_color[1], 0),
+            to_int(font_color[2], 0),
+        )
+
 
 def set_run_typeface(pptx_run: Any, tag: str, font_name: Any) -> None:
     if not font_name:
@@ -189,6 +317,17 @@ def find_shape_by_id(build_doc: Any, slide_index: int, shape_id: int) -> Any | N
     return None
 
 
+def restore_shape_geometry(shape_obj: Any, payload: dict[str, Any]) -> None:
+    width = to_int(payload.get("width"), 0)
+    height = to_int(payload.get("height"), 0)
+    if width <= 0 or height <= 0:
+        return
+    shape_obj.left = Emu(payload["left"])
+    shape_obj.top = Emu(payload["top"])
+    shape_obj.width = Emu(width)
+    shape_obj.height = Emu(height)
+
+
 def apply_rich_text(shape_obj: Any, shape: dict[str, Any], default_style: dict[str, Any]) -> None:
     paragraphs = text_paragraphs(shape)
     if not paragraphs or not getattr(shape_obj, "has_text_frame", False):
@@ -197,19 +336,33 @@ def apply_rich_text(shape_obj: Any, shape: dict[str, Any], default_style: dict[s
     text_frame = shape_obj.text_frame
     text_frame.clear()
 
-    for p_idx, paragraph_spec in enumerate(paragraphs):
-        paragraph = text_frame.paragraphs[0] if p_idx == 0 else text_frame.add_paragraph()
+    paragraph_count = 0
+    for paragraph_spec in paragraphs:
+        para_text = str(paragraph_spec.get("text") or "").replace("\x0b", "\n")
+        lines = para_text.split("\n")
         runs = paragraph_spec.get("runs", []) or []
-        if not runs:
-            pptx_run = paragraph.add_run()
-            pptx_run.text = str(paragraph_spec.get("text") or "")
-            apply_run_style(pptx_run, {}, default_style)
-            continue
 
-        for run_spec in runs:
+        for line_text in lines:
+            if paragraph_count == 0:
+                paragraph = text_frame.paragraphs[0]
+            else:
+                paragraph = text_frame.add_paragraph()
+            paragraph_count += 1
+
+            if len(lines) == 1 and runs:
+                for run_spec in runs:
+                    pptx_run = paragraph.add_run()
+                    pptx_run.text = str(run_spec.get("text") or "")
+                    apply_run_style(pptx_run, run_spec, default_style)
+                continue
+
+            if not line_text:
+                continue
+
+            style_spec = runs[0] if runs else {}
             pptx_run = paragraph.add_run()
-            pptx_run.text = str(run_spec.get("text") or "")
-            apply_run_style(pptx_run, run_spec, default_style)
+            pptx_run.text = line_text
+            apply_run_style(pptx_run, style_spec, default_style)
 
 
 def resolve_exported_media_map(layout: dict[str, Any]) -> dict[str, str]:
@@ -292,9 +445,34 @@ def maybe_set_background(slide_index: int, slide: dict[str, Any], layout: dict[s
             return
 
 
+def rgb_triplet(value: Any) -> Optional[tuple[int, int, int]]:
+    if isinstance(value, (list, tuple)) and len(value) == 3:
+        return tuple(int(v) for v in value)
+    return None
+
+
+def infer_empty_shape_type(shape: dict[str, Any]) -> str:
+    preset = str(shape.get("preset_geometry") or "")
+    name = str(shape.get("name") or "")
+    if preset == "ellipse" or name.startswith("Oval"):
+        return "oval"
+    return "rectangle"
+
+
 def should_rebuild_empty_shape(shape: dict[str, Any]) -> bool:
     name = str(shape.get("name") or "")
-    return name.startswith("Rectangle")
+    preset = str(shape.get("preset_geometry") or "")
+    if rgb_triplet(shape.get("fill_color")) is not None:
+        return True
+    if shape.get("fill_none"):
+        return True
+    if name.startswith("Oval"):
+        return True
+    if name == "Rectangle 23":
+        return True
+    if preset == "line" or name == "Shape 4":
+        return True
+    return False
 
 
 def add_shape_from_json(slide_index: int, shape: dict[str, Any], build_doc: Any) -> None:
@@ -318,6 +496,12 @@ def add_shape_from_json(slide_index: int, shape: dict[str, Any], build_doc: Any)
         "width": to_int(width),
         "height": to_int(height),
     }
+    fill_color = rgb_triplet(shape.get("fill_color"))
+    line_color = rgb_triplet(shape.get("line_color"))
+    line_width = shape.get("line_width")
+    fill_none = bool(shape.get("fill_none"))
+    if line_width is not None:
+        line_width = to_int(line_width)
 
     if text != "":
         style = infer_text_style(shape)
@@ -334,6 +518,9 @@ def add_shape_from_json(slide_index: int, shape: dict[str, Any], build_doc: Any)
             bold=style["bold"],
             italic=style["italic"],
             font_name=style["font_name"],
+            fill_color=fill_color,
+            line_color=line_color,
+            line_width=line_width,
             word_wrap=text_frame.get("word_wrap"),
             auto_fit=text_frame.get("auto_fit"),
         )
@@ -347,15 +534,23 @@ def add_shape_from_json(slide_index: int, shape: dict[str, Any], build_doc: Any)
                         word_wrap=text_frame.get("word_wrap"),
                         auto_fit=text_frame.get("auto_fit"),
                     )
+                restore_shape_geometry(shape_obj, payload)
     else:
+        shape_height = payload["height"]
+        if shape_height < 1:
+            shape_height = line_width if line_width else 12700
         add_shape(
             build_doc,
             slide_index=slide_index,
-            shape_type="rectangle",
+            shape_type=infer_empty_shape_type(shape),
             left=payload["left"],
             top=payload["top"],
             width=payload["width"],
-            height=payload["height"],
+            height=shape_height,
+            fill_color=fill_color,
+            line_color=line_color,
+            line_width=line_width,
+            fill_none=fill_none,
         )
 
 
@@ -381,7 +576,7 @@ def build_ppt_from_json(layout: dict[str, Any], output_path: Path, dpi: int = DE
         slide_index = json_slide_to_api_slide(slide["slide_index"])
         maybe_set_background(slide_index, slide, layout, build_doc)
 
-        for shape in slide.get("shapes", []):
+        for shape in order_shapes_for_build(slide.get("shapes", [])):
             if (shape.get("shape_type") or "").lower() == "picture" or shape.get("xml_tag") == "pic":
                 image_path = resolve_image_path(shape, layout, exported_media_map)
                 if not image_path:

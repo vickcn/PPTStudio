@@ -219,6 +219,33 @@ def parse_text_frame_layout(tx_body) -> dict[str, Any]:
     return layout
 
 
+LIST_LINE_RE = re.compile(r"^\d+\.\s")
+
+
+def is_list_style_text(text: str, paragraphs: list | None = None) -> bool:
+    normalized = str(text or "").replace("\x0b", "\n")
+    if "\n" in normalized:
+        return True
+    if paragraphs and len(paragraphs) > 1:
+        return True
+    for line in normalized.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if LIST_LINE_RE.match(stripped):
+            return True
+        if stripped[0] in "-•·●○":
+            return True
+    return False
+
+
+def ensure_list_style_word_wrap(entry: dict) -> None:
+    if not is_list_style_text(entry.get("text", ""), entry.get("paragraphs")):
+        return
+    text_frame = entry.setdefault("text_frame", {})
+    text_frame["word_wrap"] = True
+
+
 def resolve_zip_target(base_part: str, target: str) -> str:
     base_dir = posixpath.dirname(base_part)
     normalized = posixpath.normpath(posixpath.join(base_dir, target))
@@ -455,6 +482,7 @@ def parse_layout_from_pptx(ppt_path: Path, export_media_dir: Path | None = None)
                         text, paragraphs = get_text_runs(tx_body)
                         entry["text"] = text
                         entry["paragraphs"] = paragraphs
+                        ensure_list_style_word_wrap(entry)
                     shapes.append(entry)
                     continue
 
